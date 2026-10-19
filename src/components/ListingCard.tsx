@@ -89,10 +89,10 @@ export const ListingCard: React.FC<ListingCardProps> = ({
 
         {/* Reserved Badge if listing is reserved */}
         {listing.isReserved && (
-          <div className="absolute top-3 left-12 flex items-center gap-1">
-            <span className="px-2.5 py-1 rounded-lg text-[11px] font-black text-amber-900 bg-amber-200/95 border border-amber-300 shadow-xs flex items-center gap-1 backdrop-blur-xs">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse" />
-              <span>محجوز حصرياً</span>
+          <div className="absolute top-3 left-12 flex items-center gap-1 z-10">
+            <span className="px-2.5 py-1 rounded-lg text-[11px] font-black text-amber-950 bg-amber-300 border border-amber-400 shadow-xs flex items-center gap-1.5 backdrop-blur-xs">
+              <span className="w-2 h-2 rounded-full bg-amber-800 animate-pulse" />
+              <span>محجوز مؤقتاً</span>
             </span>
           </div>
         )}
@@ -122,16 +122,6 @@ export const ListingCard: React.FC<ListingCardProps> = ({
         >
           <Heart className={`w-4 h-4 ${favorited ? 'fill-current' : ''}`} />
         </button>
-
-        {/* Temporary Booking Badge */}
-        {listing.isReserved && (
-          <div className="absolute top-12 left-3 z-10">
-            <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold text-amber-950 bg-amber-400 shadow-md flex items-center gap-1 border border-amber-300">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-900 animate-ping" />
-              <span>محجوز مؤقتاً</span>
-            </span>
-          </div>
-        )}
 
         {/* Bottom Image Overlay with Price */}
         <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-slate-950/80 via-slate-950/30 to-transparent p-3 pt-8 flex items-baseline justify-between text-white">

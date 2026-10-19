@@ -68,6 +68,10 @@ interface AppContextType {
     preferredDate?: string;
     requestedDurationHours?: number;
     seekerPhone?: string;
+    paymentMethod?: string;
+    rentalUsageType?: string;
+    leaseDurationMonths?: number;
+    paymentFrequency?: string;
   }) => Promise<{ success: boolean; message: string; request?: PropertyRequest }>;
   cancelPropertyRequest: (requestId: string, reason?: string) => Promise<{ success: boolean; message: string }>;
   acceptPropertyRequest: (requestId: string, durationHours?: number, notes?: string) => Promise<{ success: boolean; message: string; booking?: PropertyBooking }>;
@@ -1468,6 +1472,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     preferredDate?: string;
     requestedDurationHours?: number;
     seekerPhone?: string;
+    paymentMethod?: string;
+    rentalUsageType?: string;
+    leaseDurationMonths?: number;
+    paymentFrequency?: string;
   }) => {
     if (currentUser.role === 'visitor') {
       showToast('يجب تسجيل الدخول لإرسال طلب حجز أو استفسار على العقار', 'warning');

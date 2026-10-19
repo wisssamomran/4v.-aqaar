@@ -20,6 +20,7 @@ import { AdminDashboardPage } from './pages/AdminDashboardPage';
 import { HelpAndPoliciesPage } from './pages/HelpAndPoliciesPage';
 import { FavoritesPage } from './pages/FavoritesPage';
 import { MyAccountPage } from './pages/MyAccountPage';
+import { BookingsManagementPage } from './pages/BookingsManagementPage';
 import { Listing } from './types';
 import { CheckCircle2, AlertCircle, Info, XCircle } from 'lucide-react';
 
@@ -147,6 +148,7 @@ const AppContent: React.FC = () => {
             <MyAdsPage
               onNavigateToWizard={() => handleNavigate('wizard')}
               onSelectListing={handleSelectListing}
+              onNavigateToBookings={() => handleNavigate('bookings', { roleView: 'advertiser' })}
             />
           </ProtectedRoute>
         )}
@@ -226,6 +228,15 @@ const AppContent: React.FC = () => {
         {currentView === 'account' && (
           <MyAccountPage
             onNavigate={handleNavigate}
+            onOpenAuth={handleOpenAuth}
+          />
+        )}
+
+        {(currentView === 'bookings' || currentView === 'reservations' || currentView === 'seeker_bookings' || currentView === 'advertiser_bookings') && (
+          <BookingsManagementPage
+            onNavigateHome={() => handleNavigate('home')}
+            onSelectListing={handleSelectListing}
+            initialRoleView={(searchParams?.roleView as 'seeker' | 'advertiser' | undefined) || (currentView === 'advertiser_bookings' ? 'advertiser' : currentView === 'seeker_bookings' ? 'seeker' : undefined)}
             onOpenAuth={handleOpenAuth}
           />
         )}

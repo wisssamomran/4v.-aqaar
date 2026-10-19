@@ -14,7 +14,8 @@ import {
   Grid,
   Flag,
   Headphones,
-  BookOpen
+  BookOpen,
+  CalendarCheck
 } from 'lucide-react';
 
 interface TabItem {
@@ -42,6 +43,8 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
     listings,
     reports,
     tickets,
+    requests,
+    bookings,
     verificationRequests
   } = useApp();
 
@@ -56,6 +59,11 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
     l => l.advertiser.id === currentUser.id && (l.status === 'needs_changes' || l.status === 'under_review')
   ).length;
 
+  const seekerActiveBookingsCount = bookings.filter(b => b.seekerId === currentUser.id && b.status === 'active').length;
+  const incomingRequestsCount = requests.filter(r => r.status === 'pending' && (
+    currentUser.role === 'system_admin' || r.advertiserId === currentUser.id
+  )).length;
+
   // Strict 1:1 Implementation of the 10 User Roles Bottom Bar Matrix
   const getTabs = (): TabItem[] => {
     switch (currentUser.role) {
@@ -68,23 +76,23 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
           { id: 'account', label: 'تسجيل الدخول', icon: <User className="w-5 h-5" /> }
         ];
 
-      // 2. المستخدم المسجل والباحث عن عقار (5 تبويبات - مفضلة وتذاكر دعم)
+      // 2. المستخدم المسجل والباحث عن عقار (5 تبويبات - حجوزاتي ومفضلة وحسابي)
       case 'seeker':
         return [
           { id: 'home', label: 'الرئيسية', icon: <MapPin className="w-5 h-5" /> },
           { id: 'search', label: 'البحث', icon: <Search className="w-5 h-5" /> },
+          { id: 'bookings', label: 'حجوزاتي', icon: <CalendarCheck className="w-5 h-5" />, badge: seekerActiveBookingsCount },
           { id: 'favorites', label: 'المفضلة', icon: <Heart className="w-5 h-5" />, badge: favorites.length },
-          { id: 'support', label: 'تذاكر الدعم', icon: <Headphones className="w-5 h-5" /> },
           { id: 'account', label: 'حسابي', icon: <User className="w-5 h-5" /> }
         ];
 
-      // 3. المعلن الفرد الموثق (5 تبويبات مع زر أضف إعلان مركزي بارز)
+      // 3. المعلن الفرد الموثق (5 تبويبات مع الحجوزات وزر أضف إعلان مركزي بارز)
       case 'advertiser':
         return [
           { id: 'home', label: 'الرئيسية', icon: <MapPin className="w-5 h-5" /> },
           { id: 'my_ads', label: 'إعلاناتي', icon: <Grid className="w-5 h-5" />, badge: myActionableAdsCount },
           { id: 'wizard', label: 'أضف إعلان', icon: <Plus className="w-6 h-6" />, isProminent: true },
-          { id: 'favorites', label: 'المفضلة', icon: <Heart className="w-5 h-5" />, badge: favorites.length },
+          { id: 'bookings', label: 'الحجوزات', icon: <CalendarCheck className="w-5 h-5" />, badge: incomingRequestsCount },
           { id: 'account', label: 'حسابي', icon: <User className="w-5 h-5" /> }
         ];
 

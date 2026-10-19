@@ -19,15 +19,22 @@ import {
   ShieldCheck,
   ChevronDown,
   Map as MapIcon,
-  List as ListIcon
+  List as ListIcon,
+  CalendarCheck,
+  Lock
 } from 'lucide-react';
 
 interface MyAdsPageProps {
   onNavigateToWizard: () => void;
   onSelectListing: (listing: Listing) => void;
+  onNavigateToBookings?: () => void;
 }
 
-export const MyAdsPage: React.FC<MyAdsPageProps> = ({ onNavigateToWizard, onSelectListing }) => {
+export const MyAdsPage: React.FC<MyAdsPageProps> = ({
+  onNavigateToWizard,
+  onSelectListing,
+  onNavigateToBookings
+}) => {
   const { currentUser, listings, changeListingStatus, deleteListing, showToast } = useApp();
 
   const [activeTab, setActiveTab] = useState<ListingStatus | 'all' | 'reserved'>('all');
@@ -101,14 +108,59 @@ export const MyAdsPage: React.FC<MyAdsPageProps> = ({ onNavigateToWizard, onSele
           </p>
         </div>
 
-        <button
-          onClick={onNavigateToWizard}
-          className="px-5 py-2.5 bg-[#12A889] hover:bg-[#0f8d73] text-white text-xs md:text-sm font-bold rounded-xl shadow-xs transition-colors flex items-center gap-2 self-start md:self-auto"
-        >
-          <PlusCircle className="w-4 h-4" />
-          <span>إضافة إعلان جديد</span>
-        </button>
+        <div className="flex items-center gap-2.5 self-start md:self-auto flex-wrap">
+          {onNavigateToBookings && (
+            <button
+              onClick={onNavigateToBookings}
+              className="px-4 py-2.5 bg-[#16324F] hover:bg-[#12A889] text-white text-xs md:text-sm font-bold rounded-xl shadow-xs transition-colors flex items-center gap-2 cursor-pointer"
+            >
+              <CalendarCheck className="w-4 h-4 text-emerald-300" />
+              <span>إدارة الحجوزات والطلبات</span>
+              {counts.reserved > 0 && (
+                <span className="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full">
+                  {counts.reserved} محجوز
+                </span>
+              )}
+            </button>
+          )}
+
+          <button
+            onClick={onNavigateToWizard}
+            className="px-5 py-2.5 bg-[#12A889] hover:bg-[#0f8d73] text-white text-xs md:text-sm font-bold rounded-xl shadow-xs transition-colors flex items-center gap-2 cursor-pointer"
+          >
+            <PlusCircle className="w-4 h-4" />
+            <span>إضافة إعلان جديد</span>
+          </button>
+        </div>
       </div>
+
+      {/* Reserved listings banner if any */}
+      {counts.reserved > 0 && (
+        <div className="p-4 bg-amber-50 border-2 border-amber-300 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-950">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-200/80 flex items-center justify-center shrink-0 text-amber-800">
+              <Lock className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="font-black text-amber-900 block text-sm">
+                يوجد لديك {counts.reserved} عقارات بحالة حجز مؤقت سارٍ حالياً
+              </span>
+              <p className="text-slate-600 text-[11px] mt-0.5">
+                العقارات المحجوزة مقفولة ومخفية عن البحث لحماية الاتفاق حتى انتهاء المهلة أو إتمام الصفقة.
+              </p>
+            </div>
+          </div>
+          {onNavigateToBookings && (
+            <button
+              type="button"
+              onClick={onNavigateToBookings}
+              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs transition-colors self-start sm:self-auto cursor-pointer shrink-0"
+            >
+              متابعة وإدارة الحجوزات
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Basic Performance Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

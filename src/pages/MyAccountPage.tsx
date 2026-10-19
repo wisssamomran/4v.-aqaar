@@ -502,6 +502,14 @@ export const MyAccountPage: React.FC<MyAccountPageProps> = ({
 
               <div className="flex items-center gap-2">
                 <button
+                  onClick={() => onNavigate('bookings')}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                >
+                  <CalendarCheck className="w-3.5 h-3.5 text-[#12A889]" />
+                  <span>الحجوزات والطلبات</span>
+                </button>
+
+                <button
                   onClick={() => onNavigate('favorites')}
                   className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
                 >

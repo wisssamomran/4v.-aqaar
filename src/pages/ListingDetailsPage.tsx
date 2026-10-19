@@ -260,6 +260,41 @@ export const ListingDetailsPage: React.FC<ListingDetailsPageProps> = ({
           )}
         </div>
       )}
+
+      {/* Requirement 8: Banner for Completed Deals */}
+      {listing.status === 'completed' && (
+        <div className="p-4 bg-emerald-50 border-2 border-emerald-300 rounded-2xl flex items-center gap-3 text-xs text-emerald-950 shadow-xs">
+          <div className="w-9 h-9 rounded-xl bg-emerald-200/80 flex items-center justify-center flex-shrink-0 text-emerald-800">
+            <CheckCircle2 className="w-5 h-5 text-emerald-700" />
+          </div>
+          <div>
+            <div className="font-black text-sm text-emerald-900">
+              تمت الصفقة بنجاح على هذا العقار ({listing.purpose === 'sale' ? 'تم البيع بنجاح' : 'تم التأجير بنجاح'})
+            </div>
+            <p className="text-emerald-800 text-xs mt-0.5">
+              هذا العقار غير متاح لتقديم طلبات جديدة أو الحجز المؤقت نظراً لإتمام العقد ونقل الملكية/التأجير.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Requirement 8: Banner for Inactive or Unavailable Listings */}
+      {listing.status !== 'published' && listing.status !== 'completed' && !isReserved && (
+        <div className="p-4 bg-slate-100 border border-slate-300 rounded-2xl flex items-center gap-3 text-xs text-slate-800 shadow-xs">
+          <div className="w-9 h-9 rounded-xl bg-slate-200 flex items-center justify-center flex-shrink-0 text-slate-600">
+            <AlertTriangle className="w-5 h-5 text-slate-600" />
+          </div>
+          <div>
+            <div className="font-black text-sm text-slate-900">
+              هذا الإعلان غير متاح حالياً للعرض العام أو استقبال الحجوزات
+            </div>
+            <p className="text-slate-600 text-xs mt-0.5">
+              حالة الإعلان: {listing.status === 'suspended' ? 'موقوف مؤقتاً' : listing.status === 'expired' ? 'منتهي الصلاحية' : listing.status === 'under_review' ? 'قيد المراجعة الإدارية' : 'غير نشط'}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Top Breadcrumb & Action Bar */}
       <div className="flex items-center justify-between flex-wrap gap-4 border-b border-slate-200 pb-4">
         <button
@@ -546,7 +581,23 @@ export const ListingDetailsPage: React.FC<ListingDetailsPageProps> = ({
 
             {/* Temporary Booking Status / Action Banner */}
             <div className="pt-2">
-              {isReserved ? (
+              {listing.status === 'completed' ? (
+                <div className="p-3.5 bg-emerald-50 rounded-2xl border border-emerald-200 text-center space-y-1 shadow-2xs">
+                  <div className="flex items-center justify-center gap-1.5 font-black text-emerald-900 text-xs sm:text-sm">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <span>تمت الصفقة ({listing.purpose === 'sale' ? 'تم البيع' : 'تم التأجير'})</span>
+                  </div>
+                  <p className="text-[11px] text-emerald-800">هذا العقار لم يعد متاحاً للطلب أو الحجز المؤقت</p>
+                </div>
+              ) : listing.status !== 'published' && !isReserved ? (
+                <div className="p-3.5 bg-slate-100 rounded-2xl border border-slate-200 text-center space-y-1 shadow-2xs">
+                  <div className="flex items-center justify-center gap-1.5 font-bold text-slate-700 text-xs sm:text-sm">
+                    <AlertTriangle className="w-4 h-4 text-slate-500" />
+                    <span>العقار غير متاح للحجز حالياً</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">لا يستقبل هذا الإعلان طلبات حجز جديدة</p>
+                </div>
+              ) : isReserved ? (
                 <div className="p-3.5 bg-gradient-to-br from-amber-50 to-orange-50/70 rounded-2xl border border-amber-200 shadow-xs space-y-2">
                   <div className="flex items-center gap-2 text-amber-950 font-black text-xs md:text-sm">
                     <Clock className="w-4 h-4 text-amber-600 animate-pulse shrink-0" />
@@ -580,18 +631,21 @@ export const ListingDetailsPage: React.FC<ListingDetailsPageProps> = ({
                   onClick={() => {
                     if (currentUser.role === 'visitor') {
                       if (onOpenVisitorGate) {
-                        onOpenVisitorGate('تسجيل الدخول مطلوب للحجز', 'يتطلب تقديم طلب الحجز المؤقت أو المعاينة تسجيل الدخول لحماية الطرفين.');
+                        onOpenVisitorGate('تسجيل الدخول مطلوب للحجز', 'يتطلب تقديم طلب حجز العقار أو المعاينة الميدانية تسجيل الدخول لحماية الطرفين.');
                       } else if (onOpenAuth) {
-                        onOpenAuth('login', 'يرجى تسجيل الدخول لتقديم طلب حجز مؤقت');
+                        onOpenAuth('login', 'يرجى تسجيل الدخول لتقديم طلب حجز العقار');
                       }
                       return;
                     }
                     setShowBookingModal(true);
                   }}
-                  className="w-full py-3 px-4 bg-gradient-to-r from-[#12A889] to-[#0d846c] hover:from-[#0d846c] hover:to-[#096a56] text-white text-xs md:text-sm font-black rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 group"
+                  className="w-full py-3.5 px-4 bg-gradient-to-r from-[#12A889] to-[#0d846c] hover:from-[#0d846c] hover:to-[#096a56] text-white text-xs sm:text-sm font-black rounded-2xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 group cursor-pointer"
                 >
-                  <Clock className="w-4 h-4 group-hover:rotate-12 transition-transform" />
-                  <span>طلب حجز مؤقت أو معاينة ميدانية (48 ساعة)</span>
+                  <Lock className="w-4 h-4 text-emerald-200 group-hover:scale-110 transition-transform shrink-0" />
+                  <span>طلب حجز العقار</span>
+                  <span className="text-[10px] sm:text-[11px] font-bold bg-white/20 px-2 py-0.5 rounded-full mr-1">
+                    حجز مؤقت 48 ساعة
+                  </span>
                 </button>
               )}
             </div>
@@ -763,6 +817,62 @@ export const ListingDetailsPage: React.FC<ListingDetailsPageProps> = ({
           </div>
         </div>
       )}
+
+      {/* Mobile Floating Action Bar (Responsive requirement 10 & 1) */}
+      <div className="lg:hidden fixed bottom-16 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 px-4 py-2.5 shadow-xl flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <span className="text-[10px] text-slate-400 block font-bold">السعر المطلوب:</span>
+          <span className="font-black text-sm text-[#12A889] truncate block">
+            {formattedPrice()}
+          </span>
+        </div>
+
+        {listing.status === 'completed' ? (
+          <div className="py-2 px-3.5 bg-emerald-100 text-emerald-900 text-xs font-bold rounded-xl flex items-center gap-1.5 shrink-0">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+            <span>تمت الصفقة</span>
+          </div>
+        ) : listing.status !== 'published' && !isReserved ? (
+          <div className="py-2 px-3.5 bg-slate-200 text-slate-700 text-xs font-bold rounded-xl flex items-center gap-1.5 shrink-0">
+            <AlertTriangle className="w-3.5 h-3.5 text-slate-500" />
+            <span>غير متاح حالياً</span>
+          </div>
+        ) : isReserved ? (
+          <button
+            type="button"
+            onClick={() => {
+              if (currentUser.role === 'visitor') {
+                if (onOpenVisitorGate) onOpenVisitorGate('تسجيل الدخول مطلوب', 'سجل دخولك للانضمام إلى قائمة الانتظار.');
+                return;
+              }
+              setShowBookingModal(true);
+            }}
+            className="py-2.5 px-4 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition-colors shadow-xs flex items-center gap-1.5 shrink-0 cursor-pointer"
+          >
+            <Clock className="w-3.5 h-3.5" />
+            <span>محجوز - قائمة الانتظار</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              if (currentUser.role === 'visitor') {
+                if (onOpenVisitorGate) {
+                  onOpenVisitorGate('تسجيل الدخول مطلوب للحجز', 'يتطلب تقديم طلب حجز العقار تسجيل الدخول لحماية الطرفين.');
+                } else if (onOpenAuth) {
+                  onOpenAuth('login', 'يرجى تسجيل الدخول لتقديم طلب حجز العقار');
+                }
+                return;
+              }
+              setShowBookingModal(true);
+            }}
+            className="py-2.5 px-5 bg-gradient-to-r from-[#12A889] to-[#0d846c] hover:from-[#0d846c] hover:to-[#096a56] text-white text-xs font-black rounded-xl transition-all shadow-md flex items-center gap-1.5 shrink-0 cursor-pointer"
+          >
+            <Lock className="w-3.5 h-3.5 text-emerald-200" />
+            <span>طلب حجز العقار</span>
+          </button>
+        )}
+      </div>
 
       {/* Booking and Request Modal */}
       <BookingModal

@@ -16,7 +16,8 @@ import {
   LogIn,
   LogOut,
   User,
-  ChevronDown
+  ChevronDown,
+  CalendarCheck
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -32,10 +33,16 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAuth,
   onOpenRoleSwitcher
 }) => {
-  const { currentUser, setCurrentUserRole, favorites, showToast } = useApp();
+  const { currentUser, setCurrentUserRole, favorites, requests, bookings, showToast } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const isVisitor = currentUser.role === 'visitor';
+
+  // Booking & Request notification badges
+  const seekerBookingsCount = bookings.filter(b => b.seekerId === currentUser.id && b.status === 'active').length;
+  const incomingRequestsCount = requests.filter(r => r.status === 'pending' && (
+    currentUser.role === 'system_admin' || r.advertiserId === currentUser.id
+  )).length;
 
   // Role permissions checks for nav items
   const canSeeMyAds = ['advertiser', 'org_manager', 'org_agent', 'system_admin'].includes(currentUser.role);
@@ -102,6 +109,30 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }`}
               >
                 إعلاناتي
+              </button>
+            )}
+
+            {/* Bookings & Requests Navigation Button */}
+            {!isVisitor && (
+              <button
+                onClick={() => handleNavClick('bookings')}
+                className={`px-3 py-2 rounded-xl text-xs xl:text-sm font-bold transition-all flex items-center gap-1.5 ${
+                  currentView === 'bookings'
+                    ? 'bg-[#16324F] text-white shadow-xs'
+                    : 'text-slate-700 hover:text-[#12A889] hover:bg-slate-50'
+                }`}
+              >
+                <CalendarCheck className="w-4 h-4 text-[#12A889]" />
+                <span>{canSeeMyAds ? 'الطلبات والحجوزات' : 'طلباتي وحجوزاتي'}</span>
+                {canSeeMyAds && incomingRequestsCount > 0 ? (
+                  <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-white text-[10px] font-bold font-mono animate-pulse">
+                    {incomingRequestsCount}
+                  </span>
+                ) : !canSeeMyAds && seekerBookingsCount > 0 ? (
+                  <span className="px-1.5 py-0.2 rounded-full bg-emerald-600 text-white text-[10px] font-bold font-mono">
+                    {seekerBookingsCount}
+                  </span>
+                ) : null}
               </button>
             )}
 
@@ -265,6 +296,29 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               إعلاناتي
+            </button>
+          )}
+
+          {!isVisitor && (
+            <button
+              onClick={() => handleNavClick('bookings')}
+              className={`w-full text-right px-4 py-2.5 rounded-xl text-sm font-bold flex items-center justify-between ${
+                currentView === 'bookings' ? 'bg-[#16324F] text-white' : 'text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <CalendarCheck className="w-4 h-4 text-[#12A889]" />
+                <span>{canSeeMyAds ? 'الطلبات والحجوزات' : 'طلباتي وحجوزاتي'}</span>
+              </div>
+              {canSeeMyAds && incomingRequestsCount > 0 ? (
+                <span className="px-2 py-0.5 rounded-full bg-amber-500 text-white text-[11px] font-bold font-mono">
+                  {incomingRequestsCount} جديد
+                </span>
+              ) : !canSeeMyAds && seekerBookingsCount > 0 ? (
+                <span className="px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[11px] font-bold font-mono">
+                  {seekerBookingsCount} نشط
+                </span>
+              ) : null}
             </button>
           )}
 
