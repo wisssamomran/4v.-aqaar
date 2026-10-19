@@ -50,7 +50,8 @@
       "attributes": {
         "zoningType": "سكني"
       },
-      "verificationBadges": []
+      "verificationBadges": [],
+      "isReserved": false
     },
     {
       "id": "list-101",
@@ -149,7 +150,8 @@
       "viewsCount": 1420,
       "favoritesCount": 48,
       "createdAt": "2026-02-09",
-      "updatedAt": "2026-02-12"
+      "updatedAt": "2026-02-12",
+      "isReserved": false
     },
     {
       "id": "list-102",
@@ -236,7 +238,8 @@
       "viewsCount": 980,
       "favoritesCount": 31,
       "createdAt": "2026-02-13",
-      "updatedAt": "2026-02-14"
+      "updatedAt": "2026-02-14",
+      "isReserved": false
     },
     {
       "id": "list-103",
@@ -310,7 +313,10 @@
       "viewsCount": 2150,
       "favoritesCount": 79,
       "createdAt": "2026-02-18",
-      "updatedAt": "2026-02-20"
+      "updatedAt": "2026-02-20",
+      "isReserved": true,
+      "reservedUntil": "2026-10-20T01:14:54.039Z",
+      "activeBookingId": "bkg-1792372494039-300"
     },
     {
       "id": "list-104",
@@ -381,7 +387,8 @@
       "viewsCount": 1640,
       "favoritesCount": 52,
       "createdAt": "2026-02-14",
-      "updatedAt": "2026-02-15"
+      "updatedAt": "2026-02-15",
+      "isReserved": false
     },
     {
       "id": "list-105",
@@ -451,7 +458,8 @@
       "viewsCount": 890,
       "favoritesCount": 22,
       "createdAt": "2026-02-22",
-      "updatedAt": "2026-02-23"
+      "updatedAt": "2026-02-23",
+      "isReserved": false
     },
     {
       "id": "list-106",
@@ -516,7 +524,8 @@
       "viewsCount": 640,
       "favoritesCount": 19,
       "createdAt": "2026-02-25",
-      "updatedAt": "2026-02-26"
+      "updatedAt": "2026-02-26",
+      "isReserved": false
     },
     {
       "id": "list-107",
@@ -579,7 +588,8 @@
       "viewsCount": 1100,
       "favoritesCount": 38,
       "createdAt": "2026-02-24",
-      "updatedAt": "2026-02-25"
+      "updatedAt": "2026-02-25",
+      "isReserved": false
     },
     {
       "id": "list-108",
@@ -634,7 +644,8 @@
       "viewsCount": 0,
       "favoritesCount": 0,
       "createdAt": "2026-03-01",
-      "updatedAt": "2026-03-01"
+      "updatedAt": "2026-03-01",
+      "isReserved": false
     },
     {
       "id": "list-109",
@@ -697,7 +708,8 @@
       "viewsCount": 0,
       "favoritesCount": 0,
       "createdAt": "2026-03-02",
-      "updatedAt": "2026-03-02"
+      "updatedAt": "2026-03-02",
+      "isReserved": false
     },
     {
       "id": "list-110",
@@ -763,7 +775,8 @@
       "viewsCount": 0,
       "favoritesCount": 0,
       "createdAt": "2026-03-03",
-      "updatedAt": "2026-03-03"
+      "updatedAt": "2026-03-03",
+      "isReserved": false
     }
   ],
   "organizations": [
@@ -1016,6 +1029,78 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "log-1792372494041-908",
+      "timestamp": "١٩‏/١٠‏/٢٠٢٦، ١:١٤ ص",
+      "userId": "adv-1",
+      "userName": "هشام عبد الرحمن القدسي",
+      "userRole": "advertiser",
+      "action": "قبول الطلب وتأكيد الحجز المؤقت",
+      "targetType": "booking",
+      "targetId": "bkg-1792372494039-300",
+      "result": "success",
+      "details": "تم تأكيد حجز مؤقت برقم [BKG-2026-2003] على العقار [YEM-2026-103] لمدة [24] ساعة لصالح الباحث [أصيل محمد الحكيمي]"
+    },
+    {
+      "id": "log-1792372489889-625",
+      "timestamp": "١٩‏/١٠‏/٢٠٢٦، ١:١٤ ص",
+      "userId": "adv-1",
+      "userName": "هشام عبد الرحمن القدسي",
+      "userRole": "advertiser",
+      "action": "إلغاء حجز عقاري مؤقت",
+      "targetType": "booking",
+      "targetId": "bkg-1792372476615-376",
+      "result": "warning",
+      "details": "قام [هشام عبد الرحمن القدسي] بإلغاء الحجز المؤقت [BKG-2026-2002] على العقار [YEM-2026-103]. السبب: تم إلغاء الحجز باتفاق المشتري والبائع"
+    },
+    {
+      "id": "log-1792372481170-542",
+      "timestamp": "١٩‏/١٠‏/٢٠٢٦، ١:١٤ ص",
+      "userId": "usr-seeker",
+      "userName": "أصيل محمد الحكيمي",
+      "userRole": "seeker",
+      "action": "إرسال طلب عقار / حجز مؤقت",
+      "targetType": "request",
+      "targetId": "req-1792372481169-547",
+      "result": "success",
+      "details": "قام الباحث [أصيل محمد الحكيمي] بإرسال طلب نوع [booking_intent] على العقار [YEM-2026-103] برقم هاتف [+967 77 899 0011]"
+    },
+    {
+      "id": "log-1792372476617-501",
+      "timestamp": "١٩‏/١٠‏/٢٠٢٦، ١:١٤ ص",
+      "userId": "adv-1",
+      "userName": "هشام عبد الرحمن القدسي",
+      "userRole": "advertiser",
+      "action": "قبول الطلب وتأكيد الحجز المؤقت",
+      "targetType": "booking",
+      "targetId": "bkg-1792372476615-376",
+      "result": "success",
+      "details": "تم تأكيد حجز مؤقت برقم [BKG-2026-2002] على العقار [YEM-2026-103] لمدة [48] ساعة لصالح الباحث [أصيل محمد الحكيمي]"
+    },
+    {
+      "id": "log-1792372472373-273",
+      "timestamp": "١٩‏/١٠‏/٢٠٢٦، ١:١٤ ص",
+      "userId": "usr-seeker",
+      "userName": "أصيل محمد الحكيمي",
+      "userRole": "seeker",
+      "action": "إرسال طلب عقار / حجز مؤقت",
+      "targetType": "request",
+      "targetId": "req-1792372472372-799",
+      "result": "success",
+      "details": "قام الباحث [أصيل محمد الحكيمي] بإرسال طلب نوع [booking_intent] على العقار [YEM-2026-103] برقم هاتف [+967 77 899 0011]"
+    },
+    {
+      "id": "log-1792372296190-239",
+      "timestamp": "١٩‏/١٠‏/٢٠٢٦، ١:١١ ص",
+      "userId": "user-org-agent",
+      "userName": "طارق الأصبحي (موظف إعلانات)",
+      "userRole": "org_agent",
+      "action": "تبديل دور الجلسة عبر المحاكي",
+      "targetType": "user",
+      "targetId": "user-org-agent",
+      "result": "success",
+      "details": "تم تبديل دور الجلسة النشطة إلى: [org_agent] - طارق الأصبحي (موظف إعلانات)"
+    },
     {
       "id": "log-1792251516933-43",
       "timestamp": "١٧‏/١٠‏/٢٠٢٦، ٣:٣٨ م",
@@ -1295,7 +1380,7 @@
     }
   ],
   "meta": {
-    "lastUpdated": "2026-10-17T15:38:36.934Z",
+    "lastUpdated": "2026-10-19T01:14:54.041Z",
     "version": "1.0.0"
   },
   "staff": [
@@ -1781,6 +1866,188 @@
       "status": "pending_admin",
       "description": "المكتب قدم إفادة تجديد من وزارة الصناعة وقيد مراجعة الغرفة التجارية، ويطلب الإذن المؤقت لمدة 14 يوماً.",
       "createdAt": "2026-10-17 08:10"
+    }
+  ],
+  "requests": [
+    {
+      "id": "req-1792372481169-547",
+      "requestNumber": "REQ-2026-1004",
+      "listingId": "list-103",
+      "listingTitle": "أرض سكنية تجارية ممتازة على شارعين في بيت بوس",
+      "listingNumber": "YEM-2026-103",
+      "listingPrice": 360000000,
+      "listingCurrency": "YER",
+      "listingImage": "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1200&q=80",
+      "listingGovernorate": "صنعاء (أمانة العاصمة)",
+      "seekerId": "usr-seeker",
+      "seekerName": "أصيل محمد الحكيمي",
+      "seekerPhone": "+967 77 899 0011",
+      "advertiserId": "adv-1",
+      "advertiserName": "هشام عبد الرحمن القدسي",
+      "advertiserPhone": "773556677",
+      "requestType": "booking_intent",
+      "status": "accepted",
+      "notes": "طلب حجز ثان لنفس العقار",
+      "requestedDurationHours": 24,
+      "createdAt": "2026-10-19",
+      "updatedAt": "2026-10-19",
+      "bookingId": "bkg-1792372494039-300"
+    },
+    {
+      "id": "req-1792372472372-799",
+      "requestNumber": "REQ-2026-1003",
+      "listingId": "list-103",
+      "listingTitle": "أرض سكنية تجارية ممتازة على شارعين في بيت بوس",
+      "listingNumber": "YEM-2026-103",
+      "listingPrice": 360000000,
+      "listingCurrency": "YER",
+      "listingImage": "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1200&q=80",
+      "listingGovernorate": "صنعاء (أمانة العاصمة)",
+      "seekerId": "usr-seeker",
+      "seekerName": "أصيل محمد الحكيمي",
+      "seekerPhone": "+967 77 899 0011",
+      "advertiserId": "adv-1",
+      "advertiserName": "هشام عبد الرحمن القدسي",
+      "advertiserPhone": "773556677",
+      "requestType": "booking_intent",
+      "status": "accepted",
+      "notes": "طلب حجز مؤقت لمدة 48 ساعة لفحص الأوراق",
+      "requestedDurationHours": 48,
+      "createdAt": "2026-10-19",
+      "updatedAt": "2026-10-19",
+      "bookingId": "bkg-1792372476615-376"
+    },
+    {
+      "id": "req-101",
+      "requestNumber": "REQ-2026-1001",
+      "listingId": "list-1",
+      "listingTitle": "شقة فاخرة للإيجار السنوي - حدة الحي الدبلوماسي",
+      "listingNumber": "YEM-2026-101",
+      "listingPrice": 800,
+      "listingCurrency": "USD",
+      "listingImage": "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80",
+      "listingGovernorate": "صنعاء (أمانة العاصمة)",
+      "seekerId": "usr-seeker",
+      "seekerName": "أصيل محمد الحكيمي",
+      "seekerPhone": "+967 778 990 011",
+      "advertiserId": "adv-1",
+      "advertiserName": "هشام عبد الرحمن القدسي",
+      "advertiserPhone": "+967 777 012 345",
+      "requestType": "booking_intent",
+      "status": "pending",
+      "notes": "أرغب بحجز الشقة ومراجعة العقد مع المالك غداً صباحاً، جاهز لتسليم شيك الضمان.",
+      "offeredPrice": 750,
+      "preferredDate": "2026-10-20",
+      "requestedDurationHours": 48,
+      "createdAt": "2026-10-18",
+      "updatedAt": "2026-10-18"
+    },
+    {
+      "id": "req-102",
+      "requestNumber": "REQ-2026-1002",
+      "listingId": "list-2",
+      "listingTitle": "فيلا ملكية للبيع - بيت بوس حي الشباب",
+      "listingNumber": "YEM-2026-102",
+      "listingPrice": 320000,
+      "listingCurrency": "USD",
+      "listingImage": "https://images.unsplash.com/photo-1613977257363-707ba9348227?auto=format&fit=crop&w=800&q=80",
+      "listingGovernorate": "صنعاء (أمانة العاصمة)",
+      "seekerId": "usr-seeker",
+      "seekerName": "أصيل محمد الحكيمي",
+      "seekerPhone": "+967 778 990 011",
+      "advertiserId": "adv-1",
+      "advertiserName": "هشام عبد الرحمن القدسي",
+      "advertiserPhone": "+967 777 012 345",
+      "requestType": "booking_intent",
+      "status": "accepted",
+      "bookingId": "bkg-201",
+      "notes": "طلب حجز مؤقت لمدة 48 ساعة لفحص البصيرة الشرعية مع الأمين المعتمد.",
+      "requestedDurationHours": 48,
+      "createdAt": "2026-10-17",
+      "updatedAt": "2026-10-17"
+    }
+  ],
+  "bookings": [
+    {
+      "id": "bkg-1792372494039-300",
+      "bookingNumber": "BKG-2026-2003",
+      "requestId": "req-1792372481169-547",
+      "listingId": "list-103",
+      "listingTitle": "أرض سكنية تجارية ممتازة على شارعين في بيت بوس",
+      "listingNumber": "YEM-2026-103",
+      "listingImage": "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1200&q=80",
+      "listingGovernorate": "صنعاء (أمانة العاصمة)",
+      "listingPrice": 360000000,
+      "listingCurrency": "YER",
+      "seekerId": "usr-seeker",
+      "seekerName": "أصيل محمد الحكيمي",
+      "seekerPhone": "+967 77 899 0011",
+      "advertiserId": "adv-1",
+      "advertiserName": "هشام عبد الرحمن القدسي",
+      "advertiserPhone": "773556677",
+      "status": "active",
+      "durationHours": 24,
+      "startDate": "2026-10-19T01:14:54.039Z",
+      "expiresAt": "2026-10-20T01:14:54.039Z",
+      "confirmedBy": "هشام عبد الرحمن القدسي",
+      "notes": "تم قبول الطلب وتأكيد الحجز المؤقت لحين مراجعة وثائق وصكوك العقار",
+      "createdAt": "2026-10-19",
+      "updatedAt": "2026-10-19"
+    },
+    {
+      "id": "bkg-1792372476615-376",
+      "bookingNumber": "BKG-2026-2002",
+      "requestId": "req-1792372472372-799",
+      "listingId": "list-103",
+      "listingTitle": "أرض سكنية تجارية ممتازة على شارعين في بيت بوس",
+      "listingNumber": "YEM-2026-103",
+      "listingImage": "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1200&q=80",
+      "listingGovernorate": "صنعاء (أمانة العاصمة)",
+      "listingPrice": 360000000,
+      "listingCurrency": "YER",
+      "seekerId": "usr-seeker",
+      "seekerName": "أصيل محمد الحكيمي",
+      "seekerPhone": "+967 77 899 0011",
+      "advertiserId": "adv-1",
+      "advertiserName": "هشام عبد الرحمن القدسي",
+      "advertiserPhone": "773556677",
+      "status": "cancelled",
+      "durationHours": 48,
+      "startDate": "2026-10-19T01:14:36.615Z",
+      "expiresAt": "2026-10-21T01:14:36.615Z",
+      "confirmedBy": "هشام عبد الرحمن القدسي",
+      "notes": "مرحباً بك، تم تأكيد حجز الأرض مؤقتاً لمدة 48 ساعة",
+      "createdAt": "2026-10-19",
+      "updatedAt": "2026-10-19",
+      "cancelledBy": "هشام عبد الرحمن القدسي",
+      "cancelledAt": "2026-10-19T01:14:49.888Z",
+      "cancellationReason": "تم إلغاء الحجز باتفاق المشتري والبائع"
+    },
+    {
+      "id": "bkg-201",
+      "bookingNumber": "BKG-2026-2001",
+      "requestId": "req-102",
+      "listingId": "list-2",
+      "listingTitle": "فيلا ملكية للبيع - بيت بوس حي الشباب",
+      "listingNumber": "YEM-2026-102",
+      "listingImage": "https://images.unsplash.com/photo-1613977257363-707ba9348227?auto=format&fit=crop&w=800&q=80",
+      "listingGovernorate": "صنعاء (أمانة العاصمة)",
+      "listingPrice": 320000,
+      "listingCurrency": "USD",
+      "seekerId": "usr-seeker",
+      "seekerName": "أصيل محمد الحكيمي",
+      "seekerPhone": "+967 778 990 011",
+      "advertiserId": "adv-1",
+      "advertiserName": "هشام عبد الرحمن القدسي",
+      "advertiserPhone": "+967 777 012 345",
+      "status": "active",
+      "durationHours": 48,
+      "startDate": "2026-10-19T01:14:19.973Z",
+      "expiresAt": "2026-10-21T01:14:19.973Z",
+      "confirmedBy": "هشام عبد الرحمن القدسي (المعلن المعتمد)",
+      "notes": "تم قبول طلب الحجز المؤقت لمطابقة صك الملكية والبصيرة.",
+      "createdAt": "2026-10-17",
+      "updatedAt": "2026-10-17"
     }
   ]
 }

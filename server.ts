@@ -27,7 +27,9 @@ import {
   BackupPoint,
   SystemErrorLog,
   IntegrationServiceStatus,
-  EscalationCase
+  EscalationCase,
+  PropertyRequest,
+  PropertyBooking
 } from './src/types';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -779,6 +781,510 @@ app.delete(
     return res.json({ message: 'تم حذف الإعلان بنجاح' });
   }
 );
+
+// ==========================================
+// 2.5 PROPERTY REQUESTS & TEMPORARY BOOKINGS APIS
+// ==========================================
+
+// Get User's Property Requests (Role Filtered)
+app.get('/api/requests', (req: Request, res: Response) => {
+  if (req.currentUser.role === 'visitor') {
+    return res.status(401).json({ error: 'يجب تسجيل الدخول لاستعراض الطلبات العقارية' });
+  }
+
+  const allRequests = db.getRequests();
+  const user = req.currentUser;
+
+  let filtered: PropertyRequest[];
+
+  if (user.role === 'system_admin') {
+    filtered = allRequests;
+  } else if (user.role === 'org_manager') {
+    // Org manager sees requests for their listings, org listings, or sent by them
+    filtered = allRequests.filter(r => {
+      const listing = db.getListingById(r.listingId);
+      const isOrgListing = listing && user.orgId && listing.advertiser.orgId === user.orgId;
+      return r.advertiserId === user.id || r.seekerId === user.id || isOrgListing;
+    });
+  } else if (user.role === 'org_agent') {
+    // Agent sees requests for listings assigned to them or sent by them
+    filtered = allRequests.filter(r => {
+      const listing = db.getListingById(r.listingId);
+      const isAssigned = listing && listing.assignedAgentId === user.id;
+      return r.advertiserId === user.id || r.seekerId === user.id || isAssigned;
+    });
+  } else if (user.role === 'advertiser') {
+    // Advertiser sees requests on their listings or sent by them
+    filtered = allRequests.filter(r => r.advertiserId === user.id || r.seekerId === user.id);
+  } else {
+    // Seeker and other roles only see requests they submitted
+    filtered = allRequests.filter(r => r.seekerId === user.id);
+  }
+
+  return res.json({ requests: filtered, count: filtered.length });
+});
+
+// Submit New Property Request / Booking Inquiry
+app.post('/api/requests', (req: Request, res: Response) => {
+  if (req.currentUser.role === 'visitor') {
+    return res.status(401).json({ error: 'يجب تسجيل الدخول لتقديم طلب على العقار' });
+  }
+
+  const {
+    listingId,
+    requestType = 'booking_intent',
+    notes,
+    offeredPrice,
+    preferredDate,
+    requestedDurationHours = 48,
+    seekerPhone
+  } = req.body;
+
+  if (!listingId) {
+    return res.status(400).json({ error: 'معرف العقار مطلوب لتقديم الطلب' });
+  }
+
+  const listing = db.getListingById(listingId);
+  if (!listing) {
+    return res.status(404).json({ error: 'العقار المحدد غير موجود' });
+  }
+
+  // Prevent advertiser from booking their own listing
+  if (listing.advertiser.id === req.currentUser.id) {
+    return res.status(400).json({ error: 'لا يمكنك تقديم طلب حجز على عقارك الخاص المعروض باسمك' });
+  }
+
+  // Validate phone number
+  const rawPhone = seekerPhone || req.currentUser.phone;
+  const phoneCheck = validateYemeniPhone(rawPhone);
+  if (!phoneCheck.isValid) {
+    return res.status(422).json({ error: phoneCheck.error || 'رقم هاتف الباحث غير صالح' });
+  }
+
+  const safeDuration = Math.min(Math.max(Number(requestedDurationHours) || 48, 12), 168);
+  const now = new Date().toISOString().split('T')[0];
+  const reqSeq = db.getRequests().length + 1001;
+  const requestNumber = `REQ-2026-${reqSeq}`;
+
+  const newRequest: PropertyRequest = {
+    id: `req-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    requestNumber,
+    listingId: listing.id,
+    listingTitle: listing.title,
+    listingNumber: listing.listingNumber,
+    listingPrice: listing.price,
+    listingCurrency: listing.currency,
+    listingImage: listing.images?.[0],
+    listingGovernorate: listing.location?.governorate,
+    seekerId: req.currentUser.id,
+    seekerName: req.currentUser.name,
+    seekerPhone: phoneCheck.normalized,
+    advertiserId: listing.advertiser.id,
+    advertiserName: listing.advertiser.name,
+    advertiserPhone: listing.advertiser.phone,
+    requestType,
+    status: 'pending',
+    notes: notes || 'طلب اهتمام وحجز مؤقت للعقار',
+    offeredPrice: typeof offeredPrice === 'number' ? offeredPrice : undefined,
+    preferredDate: preferredDate || undefined,
+    requestedDurationHours: safeDuration,
+    createdAt: now,
+    updatedAt: now
+  };
+
+  db.addRequest(newRequest);
+
+  recordAuditLog(
+    req.currentUser,
+    'إرسال طلب عقار / حجز مؤقت',
+    'request',
+    newRequest.id,
+    'success',
+    `قام الباحث [${req.currentUser.name}] بإرسال طلب نوع [${requestType}] على العقار [${listing.listingNumber}] برقم هاتف [${phoneCheck.normalized}]`
+  );
+
+  return res.status(201).json({
+    message: 'تم إرسال طلبك إلى المعلن المسؤول بنجاح وسيتواصل معك قريباً',
+    request: newRequest
+  });
+});
+
+// Cancel Property Request
+app.patch('/api/requests/:id/cancel', (req: Request, res: Response) => {
+  if (req.currentUser.role === 'visitor') {
+    return res.status(401).json({ error: 'يجب تسجيل الدخول لإلغاء الطلب' });
+  }
+
+  const request = db.getRequestById(req.params.id);
+  if (!request) {
+    return res.status(404).json({ error: 'الطلب غير موجود' });
+  }
+
+  // Permissions: Only the seeker who submitted or system_admin
+  const isSeeker = request.seekerId === req.currentUser.id;
+  const isSysAdmin = req.currentUser.role === 'system_admin';
+
+  if (!isSeeker && !isSysAdmin) {
+    return res.status(403).json({ error: 'غير مصرح لك بإلغاء هذا الطلب' });
+  }
+
+  if (request.status === 'cancelled') {
+    return res.status(400).json({ error: 'الطلب ملغى بالفعل' });
+  }
+
+  const { reason = 'إلغاء بناءً على رغبة الباحث' } = req.body;
+
+  // If this request already had an active booking, cancel it as well
+  if (request.bookingId) {
+    const booking = db.getBookingById(request.bookingId);
+    if (booking && booking.status === 'active') {
+      db.updateBooking(booking.id, {
+        status: 'cancelled',
+        cancelledBy: req.currentUser.name,
+        cancelledAt: new Date().toISOString(),
+        cancellationReason: `تم إلغاء الحجز تلقائياً لإلغاء الطلب الأصلي: ${reason}`
+      });
+    }
+  }
+
+  const updated = db.updateRequest(request.id, {
+    status: 'cancelled',
+    cancelledBy: req.currentUser.name,
+    cancellationReason: reason
+  });
+
+  recordAuditLog(
+    req.currentUser,
+    'إلغاء طلب عقار',
+    'request',
+    request.id,
+    'warning',
+    `تم إلغاء الطلب [${request.requestNumber}] على العقار [${request.listingNumber}]. السبب: ${reason}`
+  );
+
+  return res.json({
+    message: 'تم إلغاء الطلب بنجاح',
+    request: updated
+  });
+});
+
+// Accept Property Request & Generate Temporary Booking
+app.post('/api/requests/:id/accept', (req: Request, res: Response) => {
+  if (req.currentUser.role === 'visitor') {
+    return res.status(401).json({ error: 'يجب تسجيل الدخول' });
+  }
+
+  const request = db.getRequestById(req.params.id);
+  if (!request) {
+    return res.status(404).json({ error: 'الطلب غير موجود' });
+  }
+
+  if (request.status !== 'pending') {
+    return res.status(400).json({ error: `لا يمكن قبول هذا الطلب لأنه بحالة [${request.status}] حالياً` });
+  }
+
+  const listing = db.getListingById(request.listingId);
+  if (!listing) {
+    return res.status(404).json({ error: 'العقار المرتبط بهذا الطلب لم يعد متوفراً' });
+  }
+
+  // Authorization Check: Is user the responsible advertiser, manager, assigned agent, or sysadmin?
+  const isOwner = listing.advertiser.id === req.currentUser.id;
+  const isOrgManager = req.currentUser.role === 'org_manager' && req.currentUser.orgId && listing.advertiser.orgId === req.currentUser.orgId;
+  const isAssignedAgent = listing.assignedAgentId === req.currentUser.id;
+  const isSysAdmin = req.currentUser.role === 'system_admin';
+
+  if (!isOwner && !isOrgManager && !isAssignedAgent && !isSysAdmin) {
+    return res.status(403).json({ error: 'غير مصرح لك بقبول هذا الطلب، لست المعلن المسؤول عن هذا العقار' });
+  }
+
+  // STRICT REQUIREMENT 5: Prevent conflicting active reservations on the same property!
+  const activeBooking = db.getActiveBookingForListing(request.listingId);
+  if (activeBooking) {
+    const expDateStr = new Date(activeBooking.expiresAt).toLocaleString('ar-YE', { dateStyle: 'short', timeStyle: 'short' });
+    return res.status(409).json({
+      error: `تعذر تأكيد الحجز: يوجد حجز مؤقت فعال على هذا العقار حالياً برقم [${activeBooking.bookingNumber}] ينتهي في [${expDateStr}]. لا يمكن تأكيد حجز متعارض حتى انتهاء الحجز القائم أو إلغائه.`,
+      conflictBooking: activeBooking
+    });
+  }
+
+  // Calculate Duration and Expiration Date (Requirement 4)
+  const requestedHours = typeof req.body.durationHours === 'number'
+    ? req.body.durationHours
+    : (request.requestedDurationHours || 48);
+  const durationHours = Math.min(Math.max(requestedHours, 1), 168); // 1h to 7 days max
+
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + durationHours * 3600 * 1000).toISOString();
+  const bookingSeq = db.getBookings().length + 2001;
+  const bookingNumber = `BKG-2026-${bookingSeq}`;
+
+  const newBooking: PropertyBooking = {
+    id: `bkg-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    bookingNumber,
+    requestId: request.id,
+    listingId: request.listingId,
+    listingTitle: request.listingTitle,
+    listingNumber: request.listingNumber,
+    listingImage: request.listingImage,
+    listingGovernorate: request.listingGovernorate,
+    listingPrice: request.listingPrice,
+    listingCurrency: request.listingCurrency,
+    seekerId: request.seekerId,
+    seekerName: request.seekerName,
+    seekerPhone: request.seekerPhone,
+    advertiserId: request.advertiserId,
+    advertiserName: request.advertiserName,
+    advertiserPhone: request.advertiserPhone,
+    status: 'active',
+    durationHours,
+    startDate: now.toISOString(),
+    expiresAt,
+    confirmedBy: req.currentUser.name,
+    notes: req.body.notes || 'تم قبول الطلب وتأكيد الحجز المؤقت لحين مراجعة وثائق وصكوك العقار',
+    createdAt: now.toISOString().split('T')[0],
+    updatedAt: now.toISOString().split('T')[0]
+  };
+
+  db.addBooking(newBooking);
+
+  const updatedRequest = db.updateRequest(request.id, {
+    status: 'accepted',
+    bookingId: newBooking.id
+  });
+
+  recordAuditLog(
+    req.currentUser,
+    'قبول الطلب وتأكيد الحجز المؤقت',
+    'booking',
+    newBooking.id,
+    'success',
+    `تم تأكيد حجز مؤقت برقم [${bookingNumber}] على العقار [${listing.listingNumber}] لمدة [${durationHours}] ساعة لصالح الباحث [${request.seekerName}]`
+  );
+
+  return res.status(201).json({
+    message: `تم قبول الطلب وتأكيد الحجز المؤقت بنجاح لمدة ${durationHours} ساعة برقم ${bookingNumber}`,
+    request: updatedRequest,
+    booking: newBooking
+  });
+});
+
+// Reject Property Request
+app.post('/api/requests/:id/reject', (req: Request, res: Response) => {
+  if (req.currentUser.role === 'visitor') {
+    return res.status(401).json({ error: 'يجب تسجيل الدخول' });
+  }
+
+  const request = db.getRequestById(req.params.id);
+  if (!request) {
+    return res.status(404).json({ error: 'الطلب غير موجود' });
+  }
+
+  const listing = db.getListingById(request.listingId);
+  const isOwner = listing && listing.advertiser.id === req.currentUser.id;
+  const isOrgManager = req.currentUser.role === 'org_manager' && listing && req.currentUser.orgId && listing.advertiser.orgId === req.currentUser.orgId;
+  const isAssignedAgent = listing && listing.assignedAgentId === req.currentUser.id;
+  const isSysAdmin = req.currentUser.role === 'system_admin';
+
+  if (!isOwner && !isOrgManager && !isAssignedAgent && !isSysAdmin) {
+    return res.status(403).json({ error: 'غير مصرح لك برفض هذا الطلب' });
+  }
+
+  const { reason = 'اعتذار المعلن لعدم ملاءمة الشروط أو وجود اتفاق مسبق' } = req.body;
+
+  const updated = db.updateRequest(request.id, {
+    status: 'rejected',
+    rejectionReason: reason
+  });
+
+  recordAuditLog(
+    req.currentUser,
+    'رفض طلب عقار',
+    'request',
+    request.id,
+    'warning',
+    `قام المعلن برفض الطلب [${request.requestNumber}] على العقار [${request.listingNumber}]. السبب: ${reason}`
+  );
+
+  return res.json({
+    message: 'تم تسجيل رفض الطلب وإشعار الباحث',
+    request: updated
+  });
+});
+
+// Get User's Bookings (Role Filtered)
+app.get('/api/bookings', (req: Request, res: Response) => {
+  if (req.currentUser.role === 'visitor') {
+    return res.status(401).json({ error: 'يجب تسجيل الدخول لاستعراض الحجوزات' });
+  }
+
+  const allBookings = db.getBookings();
+  const user = req.currentUser;
+
+  let filtered: PropertyBooking[];
+
+  if (user.role === 'system_admin') {
+    filtered = allBookings;
+  } else if (user.role === 'org_manager') {
+    filtered = allBookings.filter(b => {
+      const listing = db.getListingById(b.listingId);
+      const isOrgListing = listing && user.orgId && listing.advertiser.orgId === user.orgId;
+      return b.advertiserId === user.id || b.seekerId === user.id || isOrgListing;
+    });
+  } else if (user.role === 'org_agent') {
+    filtered = allBookings.filter(b => {
+      const listing = db.getListingById(b.listingId);
+      const isAssigned = listing && listing.assignedAgentId === user.id;
+      return b.advertiserId === user.id || b.seekerId === user.id || isAssigned;
+    });
+  } else if (user.role === 'advertiser') {
+    filtered = allBookings.filter(b => b.advertiserId === user.id || b.seekerId === user.id);
+  } else {
+    filtered = allBookings.filter(b => b.seekerId === user.id);
+  }
+
+  return res.json({ bookings: filtered, count: filtered.length });
+});
+
+// Get Active Booking Status For Single Listing (Public/Authorized info)
+app.get('/api/bookings/listing/:listingId', (req: Request, res: Response) => {
+  const listingId = req.params.listingId;
+  const activeBooking = db.getActiveBookingForListing(listingId);
+
+  if (!activeBooking) {
+    return res.json({ hasActiveBooking: false, isReserved: false });
+  }
+
+  // Sanitize contact details if viewer is not owner/seeker/admin
+  const isOwner = activeBooking.advertiserId === req.currentUser.id;
+  const isSeeker = activeBooking.seekerId === req.currentUser.id;
+  const isPrivileged = ['system_admin', 'moderator', 'verifier'].includes(req.currentUser.role);
+
+  if (isOwner || isSeeker || isPrivileged) {
+    return res.json({
+      hasActiveBooking: true,
+      isReserved: true,
+      booking: activeBooking
+    });
+  }
+
+  // Public/seeker view: show only that it's reserved and expiration time
+  return res.json({
+    hasActiveBooking: true,
+    isReserved: true,
+    booking: {
+      bookingNumber: activeBooking.bookingNumber,
+      status: activeBooking.status,
+      expiresAt: activeBooking.expiresAt,
+      durationHours: activeBooking.durationHours
+    }
+  });
+});
+
+// Cancel Temporary Booking (Seeker, Advertiser, or Admin)
+app.patch('/api/bookings/:id/cancel', (req: Request, res: Response) => {
+  if (req.currentUser.role === 'visitor') {
+    return res.status(401).json({ error: 'يجب تسجيل الدخول لإلغاء الحجز' });
+  }
+
+  const booking = db.getBookingById(req.params.id);
+  if (!booking) {
+    return res.status(404).json({ error: 'الحجز غير موجود' });
+  }
+
+  if (booking.status !== 'active') {
+    return res.status(400).json({ error: `لا يمكن إلغاء الحجز لأنه بحالة [${booking.status}] حالياً` });
+  }
+
+  const listing = db.getListingById(booking.listingId);
+  const isSeeker = booking.seekerId === req.currentUser.id;
+  const isOwner = booking.advertiserId === req.currentUser.id || (listing && listing.advertiser.id === req.currentUser.id);
+  const isOrgManager = req.currentUser.role === 'org_manager' && listing && req.currentUser.orgId && listing.advertiser.orgId === req.currentUser.orgId;
+  const isAssignedAgent = listing && listing.assignedAgentId === req.currentUser.id;
+  const isSysAdmin = req.currentUser.role === 'system_admin';
+
+  if (!isSeeker && !isOwner && !isOrgManager && !isAssignedAgent && !isSysAdmin) {
+    return res.status(403).json({ error: 'غير مصرح لك بإلغاء هذا الحجز' });
+  }
+
+  const { reason = 'إلغاء الحجز باتفاق الطرفين أو انتهاء الاهتمام' } = req.body;
+  const now = new Date().toISOString();
+
+  const updatedBooking = db.updateBooking(booking.id, {
+    status: 'cancelled',
+    cancelledBy: req.currentUser.name,
+    cancelledAt: now,
+    cancellationReason: reason
+  });
+
+  recordAuditLog(
+    req.currentUser,
+    'إلغاء حجز عقاري مؤقت',
+    'booking',
+    booking.id,
+    'warning',
+    `قام [${req.currentUser.name}] بإلغاء الحجز المؤقت [${booking.bookingNumber}] على العقار [${booking.listingNumber}]. السبب: ${reason}`
+  );
+
+  return res.json({
+    message: 'تم إلغاء الحجز المؤقت بنجاح وأصبح العقار متاحاً فوراً لحجوزات أخرى',
+    booking: updatedBooking
+  });
+});
+
+// Extend Temporary Booking Duration
+app.patch('/api/bookings/:id/extend', (req: Request, res: Response) => {
+  if (req.currentUser.role === 'visitor') {
+    return res.status(401).json({ error: 'يجب تسجيل الدخول' });
+  }
+
+  const booking = db.getBookingById(req.params.id);
+  if (!booking) {
+    return res.status(404).json({ error: 'الحجز غير موجود' });
+  }
+
+  if (booking.status !== 'active') {
+    return res.status(400).json({ error: 'لا يمكن تمديد حجز غير فعال' });
+  }
+
+  const listing = db.getListingById(booking.listingId);
+  const isOwner = booking.advertiserId === req.currentUser.id || (listing && listing.advertiser.id === req.currentUser.id);
+  const isOrgManager = req.currentUser.role === 'org_manager' && listing && req.currentUser.orgId && listing.advertiser.orgId === req.currentUser.orgId;
+  const isSysAdmin = req.currentUser.role === 'system_admin';
+
+  if (!isOwner && !isOrgManager && !isSysAdmin) {
+    return res.status(403).json({ error: 'فقط المعلن المسؤول أو مدير النظام يمكنهما تمديد الحجز' });
+  }
+
+  const additionalHours = Number(req.body.additionalHours) || 24;
+  const newTotalDuration = (booking.durationHours || 48) + additionalHours;
+
+  if (newTotalDuration > 168) {
+    return res.status(422).json({ error: 'الحد الأقصى الإجمالي للحجز المؤقت هو 7 أيام (168 ساعة) حفاظاً على سيولة السوق العقاري' });
+  }
+
+  const currentExpires = new Date(booking.expiresAt).getTime();
+  const newExpiresAt = new Date(currentExpires + additionalHours * 3600 * 1000).toISOString();
+
+  const updatedBooking = db.updateBooking(booking.id, {
+    durationHours: newTotalDuration,
+    expiresAt: newExpiresAt
+  });
+
+  recordAuditLog(
+    req.currentUser,
+    'تمديد مدة الحجز المؤقت',
+    'booking',
+    booking.id,
+    'success',
+    `تم تمديد الحجز [${booking.bookingNumber}] بإضافة [${additionalHours}] ساعة ليصبح الإجمالي [${newTotalDuration}] ساعة حتى [${newExpiresAt}]`
+  );
+
+  return res.json({
+    message: `تم تمديد الحجز بنجاح لمدة ${additionalHours} ساعة إضافية`,
+    booking: updatedBooking
+  });
+});
 
 // ==========================================
 // 3. MODERATION & WORKFLOW STATUS APIS

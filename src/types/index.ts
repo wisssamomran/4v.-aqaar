@@ -39,7 +39,8 @@ export type ListingStatus =
   | 'suspended'             // موقوف مؤقتاً
   | 'expired'               // منتهٍ
   | 'rejected'              // مرفوض
-  | 'cancelled';            // ملغى
+  | 'cancelled'             // ملغى
+  | 'completed';            // تم إتمام الصفقة (بيع / تأجير) ونقل الملكية
 
 export interface VerificationBadge {
   type: 'phone_verified' | 'advertiser_reviewed' | 'org_reviewed' | 'deed_reviewed';
@@ -147,6 +148,11 @@ export interface Listing {
   isFeatured?: boolean;
   paymentStatus?: 'paid' | 'pending' | 'overdue';
   subscriptionPackage?: 'standard' | 'featured' | 'premium';
+  
+  // نظام الحجوزات المؤقتة
+  isReserved?: boolean;
+  reservedUntil?: string;
+  activeBookingId?: string;
   
   createdAt: string;
   updatedAt: string;
@@ -257,6 +263,71 @@ export interface SupportTicket {
   updatedAt: string;
 }
 
+export type PropertyRequestType = 'booking_intent' | 'visit_inquiry' | 'price_offer';
+export type PropertyRequestStatus = 'pending' | 'accepted' | 'rejected' | 'cancelled';
+
+export interface PropertyRequest {
+  id: string;
+  requestNumber: string; // e.g. REQ-2026-1001
+  listingId: string;
+  listingTitle: string;
+  listingNumber: string;
+  listingPrice: number;
+  listingCurrency: Currency;
+  listingImage?: string;
+  listingGovernorate?: string;
+  seekerId: string;
+  seekerName: string;
+  seekerPhone: string;
+  advertiserId: string;
+  advertiserName: string;
+  advertiserPhone: string;
+  requestType: PropertyRequestType;
+  status: PropertyRequestStatus;
+  notes: string;
+  offeredPrice?: number;
+  preferredDate?: string;
+  requestedDurationHours: number; // default 48
+  rejectionReason?: string;
+  cancellationReason?: string;
+  cancelledBy?: string;
+  bookingId?: string; // ID of booking created upon acceptance
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type PropertyBookingStatus = 'active' | 'completed' | 'cancelled' | 'expired';
+
+export interface PropertyBooking {
+  id: string;
+  bookingNumber: string; // e.g. BKG-2026-2001
+  requestId: string;
+  listingId: string;
+  listingTitle: string;
+  listingNumber: string;
+  listingImage?: string;
+  listingGovernorate?: string;
+  listingPrice: number;
+  listingCurrency: Currency;
+  seekerId: string;
+  seekerName: string;
+  seekerPhone: string;
+  advertiserId: string;
+  advertiserName: string;
+  advertiserPhone: string;
+  status: PropertyBookingStatus;
+  durationHours: number; // Default 48 hours, configurable
+  startDate: string; // ISO string
+  expiresAt: string; // ISO string
+  confirmedBy: string;
+  notes?: string;
+  cancellationReason?: string;
+  cancelledBy?: string;
+  cancelledAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AuditLogEntry {
   id: string;
   timestamp: string;
@@ -264,7 +335,7 @@ export interface AuditLogEntry {
   userName: string;
   userRole: UserRole;
   action: string;
-  targetType: 'listing' | 'user' | 'organization' | 'verification' | 'report' | 'ticket' | 'system_setting' | 'staff' | 'security' | 'backup' | 'feature_flag' | 'permission';
+  targetType: 'listing' | 'user' | 'organization' | 'verification' | 'report' | 'ticket' | 'system_setting' | 'staff' | 'security' | 'backup' | 'feature_flag' | 'permission' | 'request' | 'booking';
   targetId: string;
   result: 'success' | 'warning' | 'denied';
   details: string;

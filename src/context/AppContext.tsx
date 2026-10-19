@@ -18,7 +18,10 @@ import {
   BackupPoint,
   SystemErrorLog,
   IntegrationServiceStatus,
-  EscalationCase
+  EscalationCase,
+  PropertyRequest,
+  PropertyRequestType,
+  PropertyBooking
 } from '../types';
 import {
   INITIAL_LISTINGS,
@@ -52,6 +55,26 @@ interface AppContextType {
   favorites: string[];
   googleMapsApiKey: string;
   setGoogleMapsApiKey: (key: string) => void;
+
+  // Real Estate Requests & Temporary Bookings System
+  requests: PropertyRequest[];
+  bookings: PropertyBooking[];
+  fetchRequestsAndBookings: () => Promise<void>;
+  submitPropertyRequest: (data: {
+    listingId: string;
+    requestType?: PropertyRequestType;
+    notes?: string;
+    offeredPrice?: number;
+    preferredDate?: string;
+    requestedDurationHours?: number;
+    seekerPhone?: string;
+  }) => Promise<{ success: boolean; message: string; request?: PropertyRequest }>;
+  cancelPropertyRequest: (requestId: string, reason?: string) => Promise<{ success: boolean; message: string }>;
+  acceptPropertyRequest: (requestId: string, durationHours?: number, notes?: string) => Promise<{ success: boolean; message: string; booking?: PropertyBooking }>;
+  rejectPropertyRequest: (requestId: string, reason?: string) => Promise<{ success: boolean; message: string }>;
+  cancelBooking: (bookingId: string, reason?: string) => Promise<{ success: boolean; message: string }>;
+  extendBooking: (bookingId: string, additionalHours: number) => Promise<{ success: boolean; message: string }>;
+  getActiveBookingForListing: (listingId: string) => PropertyBooking | undefined;
   
   // Listings CRUD & Transitions
   createListing: (listingData: Omit<Listing, 'id' | 'listingNumber' | 'createdAt' | 'updatedAt' | 'viewsCount' | 'favoritesCount' | 'statusTimeline'>) => Promise<Listing | null>;
@@ -227,6 +250,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const saved = localStorage.getItem('dalani_favorites');
     return saved ? JSON.parse(saved) : ['list-101', 'list-103'];
   });
+
+  // Real Estate Requests & Temporary Bookings State
+  const [requests, setRequests] = useState<PropertyRequest[]>([]);
+  const [bookings, setBookings] = useState<PropertyBooking[]>([]);
 
   const [googleMapsApiKey, setGoogleMapsApiKeyState] = useState<string>(() => {
     return localStorage.getItem('dalani_gmaps_key') || (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) || '';
@@ -746,6 +773,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // Fetch real estate requests and temporary bookings
+  const fetchRequestsAndBookings = useCallback(async () => {
+    if (currentUser.role === 'visitor') {
+      setRequests([]);
+      setBookings([]);
+      return;
+    }
+    try {
+      const [reqRes, bkgRes] = await Promise.all([
+        apiFetch('/api/requests'),
+        apiFetch('/api/bookings')
+      ]);
+      if (reqRes && reqRes.ok) {
+        const json = await reqRes.json();
+        if (Array.isArray(json.requests)) {
+          setRequests(json.requests);
+        }
+      }
+      if (bkgRes && bkgRes.ok) {
+        const json = await bkgRes.json();
+        if (Array.isArray(json.bookings)) {
+          setBookings(json.bookings);
+        }
+      }
+    } catch (e) {
+      console.warn('[Dalani Client] Error fetching requests/bookings:', e);
+    }
+  }, [apiFetch, currentUser.role]);
+
   // Sync data from Server API
   const refreshData = useCallback(async () => {
     try {
@@ -759,6 +815,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
 
+      await fetchRequestsAndBookings();
+
       // If privileged role, load audit logs and admin governance suite
       if (currentUser.role === 'system_admin') {
         fetchAdminData();
@@ -766,7 +824,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (e) {
       console.warn('[Dalani Client] Server sync fallback to local cache:', e);
     }
-  }, [apiFetch, currentUser.role, fetchAdminData]);
+  }, [apiFetch, currentUser.role, fetchAdminData, fetchRequestsAndBookings]);
 
   // Initial load and whenever role changes
   useEffect(() => {
@@ -1397,6 +1455,151 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('تمت إعادة ضبط البيانات الأولية بنجاح', 'info');
   };
 
+  // ==========================================
+  // PROPERTY REQUESTS & TEMPORARY BOOKINGS ACTIONS
+  // ==========================================
+
+  const submitPropertyRequest = async (data: {
+    listingId: string;
+    requestType?: PropertyRequestType;
+    notes?: string;
+    offeredPrice?: number;
+    preferredDate?: string;
+    requestedDurationHours?: number;
+    seekerPhone?: string;
+  }) => {
+    if (currentUser.role === 'visitor') {
+      showToast('يجب تسجيل الدخول لإرسال طلب حجز أو استفسار على العقار', 'warning');
+      return { success: false, message: 'يجب تسجيل الدخول' };
+    }
+    try {
+      const res = await apiFetch('/api/requests', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+      const json = await res?.json();
+      if (res && res.ok) {
+        showToast(json.message || 'تم إرسال طلبك بنجاح', 'success');
+        await Promise.all([fetchRequestsAndBookings(), refreshData()]);
+        return { success: true, message: json.message, request: json.request };
+      } else {
+        const msg = json?.error || 'تعذر إرسال الطلب';
+        showToast(msg, 'error');
+        return { success: false, message: msg };
+      }
+    } catch (err: any) {
+      showToast('حدث خطأ في الاتصال بالخادم', 'error');
+      return { success: false, message: err?.message || 'خطأ غير متوقع' };
+    }
+  };
+
+  const cancelPropertyRequest = async (requestId: string, reason?: string) => {
+    try {
+      const res = await apiFetch(`/api/requests/${requestId}/cancel`, {
+        method: 'PATCH',
+        body: JSON.stringify({ reason })
+      });
+      const json = await res?.json();
+      if (res && res.ok) {
+        showToast(json.message || 'تم إلغاء الطلب بنجاح', 'info');
+        await Promise.all([fetchRequestsAndBookings(), refreshData()]);
+        return { success: true, message: json.message };
+      } else {
+        showToast(json?.error || 'تعذر إلغاء الطلب', 'error');
+        return { success: false, message: json?.error };
+      }
+    } catch (err: any) {
+      return { success: false, message: err.message };
+    }
+  };
+
+  const acceptPropertyRequest = async (requestId: string, durationHours?: number, notes?: string) => {
+    try {
+      const res = await apiFetch(`/api/requests/${requestId}/accept`, {
+        method: 'POST',
+        body: JSON.stringify({ durationHours, notes })
+      });
+      const json = await res?.json();
+      if (res && res.ok) {
+        showToast(json.message || 'تم تأكيد الحجز المؤقت بنجاح', 'success');
+        await Promise.all([fetchRequestsAndBookings(), refreshData()]);
+        return { success: true, message: json.message, booking: json.booking };
+      } else {
+        showToast(json?.error || 'تعذر قبول الطلب', 'error');
+        return { success: false, message: json?.error };
+      }
+    } catch (err: any) {
+      return { success: false, message: err.message };
+    }
+  };
+
+  const rejectPropertyRequest = async (requestId: string, reason?: string) => {
+    try {
+      const res = await apiFetch(`/api/requests/${requestId}/reject`, {
+        method: 'POST',
+        body: JSON.stringify({ reason })
+      });
+      const json = await res?.json();
+      if (res && res.ok) {
+        showToast(json.message || 'تم رفض الطلب', 'info');
+        await Promise.all([fetchRequestsAndBookings(), refreshData()]);
+        return { success: true, message: json.message };
+      } else {
+        showToast(json?.error || 'تعذر رفض الطلب', 'error');
+        return { success: false, message: json?.error };
+      }
+    } catch (err: any) {
+      return { success: false, message: err.message };
+    }
+  };
+
+  const cancelBooking = async (bookingId: string, reason?: string) => {
+    try {
+      const res = await apiFetch(`/api/bookings/${bookingId}/cancel`, {
+        method: 'PATCH',
+        body: JSON.stringify({ reason })
+      });
+      const json = await res?.json();
+      if (res && res.ok) {
+        showToast(json.message || 'تم إلغاء الحجز المؤقت', 'info');
+        await Promise.all([fetchRequestsAndBookings(), refreshData()]);
+        return { success: true, message: json.message };
+      } else {
+        showToast(json?.error || 'تعذر إلغاء الحجز', 'error');
+        return { success: false, message: json?.error };
+      }
+    } catch (err: any) {
+      return { success: false, message: err.message };
+    }
+  };
+
+  const extendBooking = async (bookingId: string, additionalHours: number) => {
+    try {
+      const res = await apiFetch(`/api/bookings/${bookingId}/extend`, {
+        method: 'PATCH',
+        body: JSON.stringify({ additionalHours })
+      });
+      const json = await res?.json();
+      if (res && res.ok) {
+        showToast(json.message || 'تم تمديد مدة الحجز', 'success');
+        await Promise.all([fetchRequestsAndBookings(), refreshData()]);
+        return { success: true, message: json.message };
+      } else {
+        showToast(json?.error || 'تعذر تمديد الحجز', 'error');
+        return { success: false, message: json?.error };
+      }
+    } catch (err: any) {
+      return { success: false, message: err.message };
+    }
+  };
+
+  const getActiveBookingForListing = useCallback((listingId: string): PropertyBooking | undefined => {
+    const now = new Date().getTime();
+    return bookings.find(
+      b => b.listingId === listingId && b.status === 'active' && new Date(b.expiresAt).getTime() > now
+    );
+  }, [bookings]);
+
   return (
     <AppContext.Provider
       value={{
@@ -1415,6 +1618,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         favorites,
         googleMapsApiKey,
         setGoogleMapsApiKey,
+
+        // Requests & Bookings System
+        requests,
+        bookings,
+        fetchRequestsAndBookings,
+        submitPropertyRequest,
+        cancelPropertyRequest,
+        acceptPropertyRequest,
+        rejectPropertyRequest,
+        cancelBooking,
+        extendBooking,
+        getActiveBookingForListing,
         createListing,
         updateListing,
         deleteListing,

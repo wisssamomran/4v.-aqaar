@@ -20,7 +20,9 @@ import {
   BackupPoint,
   SystemErrorLog,
   IntegrationServiceStatus,
-  EscalationCase
+  EscalationCase,
+  PropertyRequest,
+  PropertyBooking
 } from '../types';
 import {
   INITIAL_LISTINGS,
@@ -51,6 +53,8 @@ export interface DatabaseSchema {
   systemErrors: SystemErrorLog[];
   integrations: IntegrationServiceStatus[];
   escalations: EscalationCase[];
+  requests: PropertyRequest[];
+  bookings: PropertyBooking[];
   meta: {
     lastUpdated: string;
     version: string;
@@ -103,6 +107,9 @@ export function normalizeListing(l: any): Listing {
     statusTimeline: Array.isArray(l.statusTimeline) ? l.statusTimeline : [],
     viewsCount: typeof l.viewsCount === 'number' ? l.viewsCount : 0,
     favoritesCount: typeof l.favoritesCount === 'number' ? l.favoritesCount : 0,
+    isReserved: Boolean(l.isReserved),
+    reservedUntil: l.reservedUntil,
+    activeBookingId: l.activeBookingId,
     createdAt: l.createdAt || new Date().toISOString().split('T')[0],
     updatedAt: l.updatedAt || new Date().toISOString().split('T')[0]
   };
@@ -461,12 +468,100 @@ function getDefaultEscalations(): EscalationCase[] {
   ];
 }
 
+function getDefaultRequests(): PropertyRequest[] {
+  return [
+    {
+      id: 'req-101',
+      requestNumber: 'REQ-2026-1001',
+      listingId: 'list-1',
+      listingTitle: 'شقة فاخرة للإيجار السنوي - حدة الحي الدبلوماسي',
+      listingNumber: 'YEM-2026-101',
+      listingPrice: 800,
+      listingCurrency: 'USD',
+      listingImage: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80',
+      listingGovernorate: 'صنعاء (أمانة العاصمة)',
+      seekerId: 'usr-seeker',
+      seekerName: 'أصيل محمد الحكيمي',
+      seekerPhone: '+967 778 990 011',
+      advertiserId: 'adv-1',
+      advertiserName: 'هشام عبد الرحمن القدسي',
+      advertiserPhone: '+967 777 012 345',
+      requestType: 'booking_intent',
+      status: 'pending',
+      notes: 'أرغب بحجز الشقة ومراجعة العقد مع المالك غداً صباحاً، جاهز لتسليم شيك الضمان.',
+      offeredPrice: 750,
+      preferredDate: '2026-10-20',
+      requestedDurationHours: 48,
+      createdAt: '2026-10-18',
+      updatedAt: '2026-10-18'
+    },
+    {
+      id: 'req-102',
+      requestNumber: 'REQ-2026-1002',
+      listingId: 'list-2',
+      listingTitle: 'فيلا ملكية للبيع - بيت بوس حي الشباب',
+      listingNumber: 'YEM-2026-102',
+      listingPrice: 320000,
+      listingCurrency: 'USD',
+      listingImage: 'https://images.unsplash.com/photo-1613977257363-707ba9348227?auto=format&fit=crop&w=800&q=80',
+      listingGovernorate: 'صنعاء (أمانة العاصمة)',
+      seekerId: 'usr-seeker',
+      seekerName: 'أصيل محمد الحكيمي',
+      seekerPhone: '+967 778 990 011',
+      advertiserId: 'adv-1',
+      advertiserName: 'هشام عبد الرحمن القدسي',
+      advertiserPhone: '+967 777 012 345',
+      requestType: 'booking_intent',
+      status: 'accepted',
+      bookingId: 'bkg-201',
+      notes: 'طلب حجز مؤقت لمدة 48 ساعة لفحص البصيرة الشرعية مع الأمين المعتمد.',
+      requestedDurationHours: 48,
+      createdAt: '2026-10-17',
+      updatedAt: '2026-10-17'
+    }
+  ];
+}
+
+function getDefaultBookings(): PropertyBooking[] {
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 48 * 3600 * 1000).toISOString();
+  return [
+    {
+      id: 'bkg-201',
+      bookingNumber: 'BKG-2026-2001',
+      requestId: 'req-102',
+      listingId: 'list-2',
+      listingTitle: 'فيلا ملكية للبيع - بيت بوس حي الشباب',
+      listingNumber: 'YEM-2026-102',
+      listingImage: 'https://images.unsplash.com/photo-1613977257363-707ba9348227?auto=format&fit=crop&w=800&q=80',
+      listingGovernorate: 'صنعاء (أمانة العاصمة)',
+      listingPrice: 320000,
+      listingCurrency: 'USD',
+      seekerId: 'usr-seeker',
+      seekerName: 'أصيل محمد الحكيمي',
+      seekerPhone: '+967 778 990 011',
+      advertiserId: 'adv-1',
+      advertiserName: 'هشام عبد الرحمن القدسي',
+      advertiserPhone: '+967 777 012 345',
+      status: 'active',
+      durationHours: 48,
+      startDate: now.toISOString(),
+      expiresAt: expiresAt,
+      confirmedBy: 'هشام عبد الرحمن القدسي (المعلن المعتمد)',
+      notes: 'تم قبول طلب الحجز المؤقت لمطابقة صك الملكية والبصيرة.',
+      createdAt: '2026-10-17',
+      updatedAt: '2026-10-17'
+    }
+  ];
+}
+
 class LocalDatabase {
   private data: DatabaseSchema;
   private isInitialized = false;
 
   constructor() {
     this.data = this.loadOrSeed();
+    this.syncListingsReservationStatus();
     this.isInitialized = true;
   }
 
@@ -505,6 +600,8 @@ class LocalDatabase {
             if (!Array.isArray(parsed.systemErrors)) { parsed.systemErrors = getDefaultSystemErrors(); }
             if (!Array.isArray(parsed.integrations)) { parsed.integrations = getDefaultIntegrations(); }
             if (!Array.isArray(parsed.escalations)) { parsed.escalations = getDefaultEscalations(); }
+            if (!Array.isArray(parsed.requests)) { parsed.requests = getDefaultRequests(); }
+            if (!Array.isArray(parsed.bookings)) { parsed.bookings = getDefaultBookings(); }
 
             this.persist(parsed);
             return parsed;
@@ -538,9 +635,11 @@ class LocalDatabase {
       systemErrors: getDefaultSystemErrors(),
       integrations: getDefaultIntegrations(),
       escalations: getDefaultEscalations(),
+      requests: getDefaultRequests(),
+      bookings: getDefaultBookings(),
       meta: {
         lastUpdated: new Date().toISOString(),
-        version: '2.0.0-enterprise'
+        version: '2.1.0-reservations'
       }
     };
 
@@ -1164,6 +1263,125 @@ class LocalDatabase {
       repairedCount: repaired,
       summary: `تم إصلاح ${repaired} علاقة وسجلات يتيمة بنجاح، وجميع البيانات مترابطة الآن.`
     };
+  }
+
+  // ==========================================
+  // PROPERTY REQUESTS & TEMPORARY BOOKINGS OPS
+  // ==========================================
+
+  public getRequests(): PropertyRequest[] {
+    return [...this.data.requests];
+  }
+
+  public getRequestById(id: string): PropertyRequest | undefined {
+    return this.data.requests.find(r => r.id === id);
+  }
+
+  public addRequest(req: PropertyRequest): PropertyRequest {
+    this.data.requests.unshift(req);
+    this.persist();
+    return req;
+  }
+
+  public updateRequest(id: string, updates: Partial<PropertyRequest>): PropertyRequest | undefined {
+    const index = this.data.requests.findIndex(r => r.id === id);
+    if (index === -1) return undefined;
+    this.data.requests[index] = {
+      ...this.data.requests[index],
+      ...updates,
+      updatedAt: new Date().toISOString().split('T')[0]
+    };
+    this.persist();
+    return this.data.requests[index];
+  }
+
+  public deleteRequest(id: string): boolean {
+    const prevLen = this.data.requests.length;
+    this.data.requests = this.data.requests.filter(r => r.id !== id);
+    if (this.data.requests.length !== prevLen) {
+      this.persist();
+      return true;
+    }
+    return false;
+  }
+
+  public getBookings(): PropertyBooking[] {
+    this.checkBookingsExpiration();
+    return [...this.data.bookings];
+  }
+
+  public getBookingById(id: string): PropertyBooking | undefined {
+    this.checkBookingsExpiration();
+    return this.data.bookings.find(b => b.id === id);
+  }
+
+  public getActiveBookingForListing(listingId: string): PropertyBooking | undefined {
+    this.checkBookingsExpiration();
+    const now = new Date().getTime();
+    return this.data.bookings.find(
+      b => b.listingId === listingId && b.status === 'active' && new Date(b.expiresAt).getTime() > now
+    );
+  }
+
+  public addBooking(booking: PropertyBooking): PropertyBooking {
+    this.data.bookings.unshift(booking);
+    this.syncListingsReservationStatus();
+    this.persist();
+    return booking;
+  }
+
+  public updateBooking(id: string, updates: Partial<PropertyBooking>): PropertyBooking | undefined {
+    const index = this.data.bookings.findIndex(b => b.id === id);
+    if (index === -1) return undefined;
+    this.data.bookings[index] = {
+      ...this.data.bookings[index],
+      ...updates,
+      updatedAt: new Date().toISOString().split('T')[0]
+    };
+    this.syncListingsReservationStatus();
+    this.persist();
+    return this.data.bookings[index];
+  }
+
+  public checkBookingsExpiration(): boolean {
+    const now = new Date().getTime();
+    let changed = false;
+    for (const b of this.data.bookings) {
+      if (b.status === 'active' && new Date(b.expiresAt).getTime() <= now) {
+        b.status = 'expired';
+        b.updatedAt = new Date().toISOString().split('T')[0];
+        changed = true;
+      }
+    }
+    if (changed) {
+      this.syncListingsReservationStatus();
+      this.persist();
+    }
+    return changed;
+  }
+
+  public syncListingsReservationStatus(): void {
+    const now = new Date().getTime();
+    const activeMap = new Map<string, PropertyBooking>();
+
+    for (const b of this.data.bookings) {
+      if (b.status === 'active' && new Date(b.expiresAt).getTime() > now) {
+        activeMap.set(b.listingId, b);
+      }
+    }
+
+    for (const listing of this.data.listings) {
+      const activeB = activeMap.get(listing.id);
+      if (activeB) {
+        listing.isReserved = true;
+        listing.reservedUntil = activeB.expiresAt;
+        listing.activeBookingId = activeB.id;
+      } else {
+        listing.isReserved = false;
+        listing.reservedUntil = undefined;
+        listing.activeBookingId = undefined;
+      }
+    }
   }
 }
 

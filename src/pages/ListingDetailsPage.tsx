@@ -3,6 +3,7 @@ import { Listing, ReportCase } from '../types';
 import { useApp } from '../context/AppContext';
 import { DalaniMap } from '../components/DalaniMap';
 import { ListingCard } from '../components/ListingCard';
+import { BookingModal } from '../components/BookingModal';
 import {
   Heart,
   Share2,
@@ -17,11 +18,13 @@ import {
   Sun,
   Layers,
   Calendar,
+  Clock,
   Compass,
   ArrowRight,
   Info,
   Check,
-  Eye
+  Eye,
+  Lock
 } from 'lucide-react';
 
 interface ListingDetailsPageProps {
@@ -39,15 +42,19 @@ export const ListingDetailsPage: React.FC<ListingDetailsPageProps> = ({
   onOpenAuth,
   onOpenVisitorGate
 }) => {
-  const { currentUser, isFavorite, toggleFavorite, submitReport, showToast, listings } = useApp();
+  const { currentUser, isFavorite, toggleFavorite, submitReport, showToast, listings, getActiveBookingForListing } = useApp();
   const favorited = isFavorite(listing.id);
 
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [showBookingModal, setShowBookingModal] = useState(false);
   const [reportReason, setReportReason] = useState<ReportCase['reason']>('false_information');
   const [reportDetails, setReportDetails] = useState('');
   const [reporterName, setReporterName] = useState('');
   const [reporterPhone, setReporterPhone] = useState('');
+
+  const activeBooking = getActiveBookingForListing(listing.id);
+  const isReserved = Boolean(listing.isReserved || activeBooking);
 
   // Safe images fallback
   const safeImages = (listing.images && listing.images.length > 0)
@@ -392,6 +399,58 @@ export const ListingDetailsPage: React.FC<ListingDetailsPageProps> = ({
               </div>
             </div>
 
+            {/* Temporary Booking Status / Action Banner */}
+            <div className="pt-2">
+              {isReserved ? (
+                <div className="p-3.5 bg-gradient-to-br from-amber-50 to-orange-50/70 rounded-2xl border border-amber-200 shadow-xs space-y-2">
+                  <div className="flex items-center gap-2 text-amber-950 font-black text-xs md:text-sm">
+                    <Clock className="w-4 h-4 text-amber-600 animate-pulse shrink-0" />
+                    <span>العقار محجوز مؤقتاً لحين فحص الوثائق</span>
+                  </div>
+                  <p className="text-[11px] text-amber-900 leading-relaxed">
+                    يوجد حجز مؤقت مفعل {activeBooking?.bookingNumber ? `برقم [${activeBooking.bookingNumber}]` : ''}. نضمن عدم تعارض الحجوزات، ويمكنك الانضمام لقائمة الانتظار.
+                  </p>
+                  {activeBooking?.expiresAt && (
+                    <div className="text-[10px] font-mono font-bold text-amber-950 bg-amber-100 px-2.5 py-1 rounded-lg border border-amber-200">
+                      ينتهي الحجز في: {new Date(activeBooking.expiresAt).toLocaleString('ar-YE', { dateStyle: 'short', timeStyle: 'short' })}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (currentUser.role === 'visitor') {
+                        if (onOpenVisitorGate) onOpenVisitorGate('تسجيل الدخول مطلوب', 'سجل دخولك للانضمام إلى قائمة انتظار العقار.');
+                        return;
+                      }
+                      setShowBookingModal(true);
+                    }}
+                    className="w-full py-2.5 px-3 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition-colors shadow-xs flex items-center justify-center gap-1.5"
+                  >
+                    <span>الانضمام لقائمة الانتظار / تقديم عرض بديل</span>
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (currentUser.role === 'visitor') {
+                      if (onOpenVisitorGate) {
+                        onOpenVisitorGate('تسجيل الدخول مطلوب للحجز', 'يتطلب تقديم طلب الحجز المؤقت أو المعاينة تسجيل الدخول لحماية الطرفين.');
+                      } else if (onOpenAuth) {
+                        onOpenAuth('login', 'يرجى تسجيل الدخول لتقديم طلب حجز مؤقت');
+                      }
+                      return;
+                    }
+                    setShowBookingModal(true);
+                  }}
+                  className="w-full py-3 px-4 bg-gradient-to-r from-[#12A889] to-[#0d846c] hover:from-[#0d846c] hover:to-[#096a56] text-white text-xs md:text-sm font-black rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 group"
+                >
+                  <Clock className="w-4 h-4 group-hover:rotate-12 transition-transform" />
+                  <span>طلب حجز مؤقت أو معاينة ميدانية (48 ساعة)</span>
+                </button>
+              )}
+            </div>
+
             {/* Direct Communication Buttons */}
             <div className="space-y-2.5 pt-2">
               {listing.advertiser.allowWhatsapp && (
@@ -559,6 +618,13 @@ export const ListingDetailsPage: React.FC<ListingDetailsPageProps> = ({
           </div>
         </div>
       )}
+
+      {/* Booking and Request Modal */}
+      <BookingModal
+        listing={listing}
+        isOpen={showBookingModal}
+        onClose={() => setShowBookingModal(false)}
+      />
     </div>
   );
 };

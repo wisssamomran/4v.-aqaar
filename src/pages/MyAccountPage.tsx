@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { UserRole, AuditLogEntry, ActiveSession } from '../types';
+import { UserRole, AuditLogEntry, ActiveSession, PropertyRequest, PropertyBooking } from '../types';
 import { ROLES_INFO } from '../components/RoleSwitcher';
 import {
   User,
@@ -16,6 +16,13 @@ import {
   Mail,
   Building,
   Calendar,
+  Clock,
+  CalendarCheck,
+  CheckCircle2,
+  XCircle,
+  PhoneCall,
+  History,
+  FileText,
   Lock,
   LogOut,
   Trash2,
@@ -52,13 +59,42 @@ export const MyAccountPage: React.FC<MyAccountPageProps> = ({
     listings,
     favorites,
     tickets,
+    requests,
+    bookings,
+    acceptPropertyRequest,
+    rejectPropertyRequest,
+    cancelPropertyRequest,
+    cancelBooking,
+    extendBooking,
+    fetchRequestsAndBookings,
     showToast
   } = useApp();
 
   const isVisitor = currentUser.role === 'visitor';
 
   // Active Tab in Dashboard
-  const [activeTab, setActiveTab] = useState<'profile' | 'membership' | 'security' | 'preferences' | 'activity' | 'shortcuts' | 'privacy'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'reservations' | 'membership' | 'security' | 'preferences' | 'activity' | 'shortcuts' | 'privacy'>('profile');
+
+  // Reservations Sub-tab & Action Modals State
+  const [resSubTab, setResSubTab] = useState<'incoming' | 'outgoing'>(() => {
+    return ['advertiser', 'org_manager', 'org_agent', 'system_admin'].includes(currentUser.role) ? 'incoming' : 'outgoing';
+  });
+  const [acceptModalRequest, setAcceptModalRequest] = useState<PropertyRequest | null>(null);
+  const [acceptDuration, setAcceptDuration] = useState<number>(48);
+  const [acceptNotes, setAcceptNotes] = useState<string>('');
+  const [isAccepting, setIsAccepting] = useState(false);
+
+  const [rejectModalRequest, setRejectModalRequest] = useState<PropertyRequest | null>(null);
+  const [rejectReason, setRejectReason] = useState<string>('');
+  const [isRejecting, setIsRejecting] = useState(false);
+
+  const [cancelBookingModalTarget, setCancelBookingModalTarget] = useState<PropertyBooking | null>(null);
+  const [cancelBookingReason, setCancelBookingReason] = useState<string>('');
+  const [isCancellingBooking, setIsCancellingBooking] = useState(false);
+
+  const [extendBookingTarget, setExtendBookingTarget] = useState<PropertyBooking | null>(null);
+  const [extendHours, setExtendHours] = useState<number>(24);
+  const [isExtendingBooking, setIsExtendingBooking] = useState(false);
 
   // Edit Profile Form State
   const [name, setName] = useState(currentUser.name);
@@ -501,6 +537,25 @@ export const MyAccountPage: React.FC<MyAccountPageProps> = ({
           </button>
 
           <button
+            onClick={() => setActiveTab('reservations')}
+            className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all flex items-center gap-2 cursor-pointer relative ${
+              activeTab === 'reservations'
+                ? 'bg-[#12A889] text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white'
+            }`}
+          >
+            <Clock className={`w-4 h-4 ${activeTab === 'reservations' ? 'text-white' : 'text-[#12A889]'}`} />
+            <span>طلباتي والحجوزات</span>
+            {(requests.length > 0 || bookings.length > 0) && (
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-extrabold ${
+                activeTab === 'reservations' ? 'bg-white text-emerald-900' : 'bg-emerald-100 text-emerald-800'
+              }`}>
+                {requests.filter(r => r.status === 'pending').length || bookings.filter(b => b.status === 'active').length || (requests.length + bookings.length)}
+              </span>
+            )}
+          </button>
+
+          <button
             onClick={() => setActiveTab('membership')}
             className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === 'membership'
@@ -698,6 +753,811 @@ export const MyAccountPage: React.FC<MyAccountPageProps> = ({
                   </button>
                 </div>
               </form>
+            </div>
+          )}
+
+          {/* TAB 1.5: RESERVATIONS & PROPERTY REQUESTS */}
+          {activeTab === 'reservations' && (
+            <div className="space-y-6">
+              {/* Header Banner & Stats */}
+              <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+                  <div>
+                    <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                      <Clock className="w-5 h-5 text-[#12A889]" />
+                      <span>إدارة الطلبات العقارية والحجوزات المؤقتة</span>
+                    </h2>
+                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                      نظام حوكمة الحجوزات: تمكين الباحث من طلب حجز مؤقت لفحص وثائق الملكية والبصيرة، مع حماية أسبقية الحجز ومنع التعارض على نفس العقار.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => fetchRequestsAndBookings()}
+                      className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5 text-[#12A889]" />
+                      <span>تحديث الحالات</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Quick Summary Counters */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-6">
+                  <div className="p-3.5 bg-emerald-50/70 border border-emerald-100 rounded-2xl">
+                    <span className="text-[11px] font-bold text-emerald-800 block mb-1">الحجوزات النشطة حالياً</span>
+                    <span className="text-2xl font-black text-emerald-900">
+                      {bookings.filter(b => b.status === 'active').length}
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 bg-amber-50/70 border border-amber-100 rounded-2xl">
+                    <span className="text-[11px] font-bold text-amber-800 block mb-1">الطلبات بانتظار الرد</span>
+                    <span className="text-2xl font-black text-amber-900">
+                      {requests.filter(r => r.status === 'pending').length}
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 bg-blue-50/70 border border-blue-100 rounded-2xl">
+                    <span className="text-[11px] font-bold text-blue-800 block mb-1">إجمالي الطلبات المسجلة</span>
+                    <span className="text-2xl font-black text-blue-900">{requests.length}</span>
+                  </div>
+
+                  <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
+                    <span className="text-[11px] font-bold text-slate-700 block mb-1">مدة الحجز الافتراضية</span>
+                    <span className="text-base font-black text-slate-900">48 ساعة عمل</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sub-Tabs: Incoming vs Outgoing */}
+              <div className="flex items-center gap-2 bg-slate-200/70 p-1.5 rounded-2xl max-w-md">
+                <button
+                  type="button"
+                  onClick={() => setResSubTab('incoming')}
+                  className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                    resSubTab === 'incoming'
+                      ? 'bg-white text-[#16324F] shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Building className="w-3.5 h-3.5 text-[#12A889]" />
+                  <span>الواردة على عقاراتي ({requests.filter(r => r.advertiserId === currentUser.id || currentUser.role === 'system_admin').length})</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setResSubTab('outgoing')}
+                  className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                    resSubTab === 'outgoing'
+                      ? 'bg-white text-[#16324F] shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <User className="w-3.5 h-3.5 text-[#12A889]" />
+                  <span>طلباتي المرسلة ({requests.filter(r => r.seekerId === currentUser.id).length})</span>
+                </button>
+              </div>
+
+              {/* SUB-VIEW 1: INCOMING REQUESTS & BOOKINGS (On My Listings) */}
+              {resSubTab === 'incoming' && (
+                <div className="space-y-6">
+                  {/* Active Bookings on My Properties */}
+                  {bookings.filter(b => b.advertiserId === currentUser.id || currentUser.role === 'system_admin').length > 0 && (
+                    <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-xs space-y-4">
+                      <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
+                        <Lock className="w-4 h-4 text-emerald-600" />
+                        <span>الحجوزات المؤقتة النشطة والمنتهية على عقاراتي</span>
+                      </h3>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                        {bookings
+                          .filter(b => b.advertiserId === currentUser.id || currentUser.role === 'system_admin')
+                          .map(bkg => {
+                            const isExpired = new Date(bkg.expiresAt).getTime() <= Date.now() || bkg.status === 'expired';
+                            const isActive = bkg.status === 'active' && !isExpired;
+                            const remainingHours = Math.max(
+                              0,
+                              Math.round((new Date(bkg.expiresAt).getTime() - Date.now()) / (1000 * 3600))
+                            );
+
+                            return (
+                              <div
+                                key={bkg.id}
+                                className={`p-4 rounded-2xl border transition-all space-y-3 ${
+                                  isActive
+                                    ? 'bg-emerald-50/40 border-emerald-200 shadow-xs'
+                                    : 'bg-slate-50 border-slate-200 opacity-80'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-mono text-xs font-black text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200">
+                                      {bkg.bookingNumber}
+                                    </span>
+                                    <span
+                                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                        isActive
+                                          ? 'bg-emerald-100 text-emerald-800 flex items-center gap-1'
+                                          : bkg.status === 'cancelled'
+                                          ? 'bg-rose-100 text-rose-800'
+                                          : 'bg-slate-200 text-slate-700'
+                                      }`}
+                                    >
+                                      {isActive && <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-ping" />}
+                                      {isActive ? 'حجز نشط' : bkg.status === 'cancelled' ? 'ملغى' : 'منتهٍ'}
+                                    </span>
+                                  </div>
+
+                                  {isActive && (
+                                    <span className="text-[11px] font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded-lg border border-amber-200">
+                                      متبقي: {remainingHours} ساعة
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div>
+                                  <h4 className="font-bold text-slate-900 text-xs sm:text-sm line-clamp-1">
+                                    {bkg.listingTitle}
+                                  </h4>
+                                  <p className="text-[11px] text-slate-500 font-mono mt-0.5">
+                                    رقم العقار: {bkg.listingNumber}
+                                  </p>
+                                </div>
+
+                                <div className="p-2.5 bg-white rounded-xl border border-slate-200 text-[11px] space-y-1">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-slate-500 font-medium">الباحث الحاجز:</span>
+                                    <span className="font-bold text-slate-800">{bkg.seekerName}</span>
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-slate-500 font-medium">هاتف الباحث:</span>
+                                    <span className="font-mono font-bold text-slate-800" dir="ltr">{bkg.seekerPhone}</span>
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-slate-500 font-medium">تاريخ الانتهاء:</span>
+                                    <span className="font-bold text-emerald-900">
+                                      {new Date(bkg.expiresAt).toLocaleString('ar-YE', { dateStyle: 'short', timeStyle: 'short' })}
+                                    </span>
+                                  </div>
+                                  {bkg.cancellationReason && (
+                                    <div className="pt-1 text-rose-700 border-t border-slate-100">
+                                      سبب الإلغاء: {bkg.cancellationReason}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {isActive && (
+                                  <div className="flex items-center gap-2 pt-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setExtendBookingTarget(bkg);
+                                        setExtendHours(24);
+                                      }}
+                                      className="flex-1 py-1.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-colors"
+                                    >
+                                      تمديد المدة
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setCancelBookingModalTarget(bkg);
+                                        setCancelBookingReason('');
+                                      }}
+                                      className="py-1.5 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-colors border border-rose-200"
+                                    >
+                                      إلغاء الحجز
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Incoming Requests on My Properties */}
+                  <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs space-y-4">
+                    <h3 className="font-extrabold text-sm text-slate-900 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-[#12A889]" />
+                        <span>قائمة الطلبات الواردة على عقاراتي ({requests.filter(r => r.advertiserId === currentUser.id || currentUser.role === 'system_admin').length})</span>
+                      </div>
+                      <span className="text-xs text-slate-500 font-normal">تحديث فوري من الخادم</span>
+                    </h3>
+
+                    {requests.filter(r => r.advertiserId === currentUser.id || currentUser.role === 'system_admin').length === 0 ? (
+                      <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-2">
+                        <CalendarCheck className="w-8 h-8 text-slate-400 mx-auto" />
+                        <p className="font-bold text-slate-700 text-sm">لا توجد طلبات واردة حالياً</p>
+                        <p className="text-xs text-slate-500">عندما يقوم الباحثون بإرسال طلبات حجز أو معاينة لعقاراتك، ستظهر مباشرة هنا لتأكيدها أو رفضها.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {requests
+                          .filter(r => r.advertiserId === currentUser.id || currentUser.role === 'system_admin')
+                          .map(req => {
+                            const isPending = req.status === 'pending';
+                            const isAccepted = req.status === 'accepted';
+                            const isRejected = req.status === 'rejected';
+
+                            return (
+                              <div
+                                key={req.id}
+                                className={`p-4 sm:p-5 rounded-2xl border transition-all ${
+                                  isPending
+                                    ? 'bg-amber-50/30 border-amber-200'
+                                    : isAccepted
+                                    ? 'bg-emerald-50/20 border-emerald-200'
+                                    : 'bg-slate-50 border-slate-200'
+                                }`}
+                              >
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-mono text-xs font-bold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
+                                      {req.requestNumber}
+                                    </span>
+                                    <span className="text-xs font-bold text-[#16324F]">{req.listingTitle}</span>
+                                    <span className="font-mono text-[11px] text-slate-500">({req.listingNumber})</span>
+                                  </div>
+
+                                  <div className="flex items-center gap-2">
+                                    <span
+                                      className={`text-xs font-extrabold px-2.5 py-0.5 rounded-full ${
+                                        isPending
+                                          ? 'bg-amber-100 text-amber-900 border border-amber-200'
+                                          : isAccepted
+                                          ? 'bg-emerald-100 text-emerald-900 border border-emerald-200'
+                                          : isRejected
+                                          ? 'bg-rose-100 text-rose-900 border border-rose-200'
+                                          : 'bg-slate-200 text-slate-800'
+                                      }`}
+                                    >
+                                      {isPending
+                                        ? 'قيد الانتظار'
+                                        : isAccepted
+                                        ? 'تم القبول وتأكيد الحجز'
+                                        : isRejected
+                                        ? 'مرفوض'
+                                        : 'ملغى'}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 py-3 text-xs">
+                                  <div>
+                                    <span className="text-slate-400 block mb-0.5">الباحث:</span>
+                                    <span className="font-bold text-slate-900">{req.seekerName}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-slate-400 block mb-0.5">رقم الهاتف:</span>
+                                    <span className="font-mono font-bold text-slate-900" dir="ltr">{req.seekerPhone}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-slate-400 block mb-0.5">نوع الطلب:</span>
+                                    <span className="font-bold text-emerald-800">
+                                      {req.requestType === 'booking_intent'
+                                        ? 'حجز مؤقت وشراء'
+                                        : req.requestType === 'visit_inquiry'
+                                        ? 'معاينة ميدانية'
+                                        : 'عرض سعر تفاوضي'}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="text-slate-400 block mb-0.5">المدة المطلوبة:</span>
+                                    <span className="font-bold text-slate-800">{req.requestedDurationHours || 48} ساعة</span>
+                                  </div>
+                                </div>
+
+                                {req.offeredPrice && (
+                                  <div className="p-2.5 bg-blue-50/70 border border-blue-100 rounded-xl text-xs text-blue-900 mb-3 flex items-center justify-between">
+                                    <span>عرض السعر المقترح من الباحث:</span>
+                                    <span className="font-black text-sm text-blue-950">
+                                      {req.offeredPrice.toLocaleString()} {req.listingCurrency}
+                                    </span>
+                                  </div>
+                                )}
+
+                                {req.notes && (
+                                  <div className="p-3 bg-white rounded-xl border border-slate-200 text-xs text-slate-700 leading-relaxed mb-3">
+                                    <span className="font-bold text-slate-900 block mb-0.5">رسالة الباحث:</span>
+                                    {req.notes}
+                                  </div>
+                                )}
+
+                                {isPending && (
+                                  <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setAcceptModalRequest(req);
+                                        setAcceptDuration(req.requestedDurationHours || 48);
+                                        setAcceptNotes('');
+                                      }}
+                                      className="py-2 px-4 rounded-xl bg-[#12A889] hover:bg-[#0f8e74] text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                                    >
+                                      <CheckCircle2 className="w-3.5 h-3.5" />
+                                      <span>قبول وتأكيد الحجز المؤقت</span>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setRejectModalRequest(req);
+                                        setRejectReason('');
+                                      }}
+                                      className="py-2 px-4 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-700 text-xs font-bold transition-all border border-slate-200 cursor-pointer"
+                                    >
+                                      <span>اعتذار ورفض الطلب</span>
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* SUB-VIEW 2: OUTGOING REQUESTS & BOOKINGS (Sent by Me) */}
+              {resSubTab === 'outgoing' && (
+                <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs space-y-4">
+                  <h3 className="font-extrabold text-sm text-slate-900 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CalendarCheck className="w-4 h-4 text-[#12A889]" />
+                      <span>طلباتي وحجوزاتي المرسلة ({requests.filter(r => r.seekerId === currentUser.id).length})</span>
+                    </div>
+                  </h3>
+
+                  {requests.filter(r => r.seekerId === currentUser.id).length === 0 ? (
+                    <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-2">
+                      <Clock className="w-8 h-8 text-slate-400 mx-auto" />
+                      <p className="font-bold text-slate-700 text-sm">لم تقم بإرسال أي طلبات حجز بعد</p>
+                      <p className="text-xs text-slate-500">تصفح العقارات المعروضة واضغط على «طلب حجز مؤقت أو معاينة ميدانية» لتقديم طلبك مباشرة.</p>
+                      <button
+                        type="button"
+                        onClick={() => onNavigate('search')}
+                        className="mt-2 px-5 py-2 rounded-xl bg-[#12A889] text-white text-xs font-bold shadow-xs hover:bg-[#0f8e74] transition-colors"
+                      >
+                        استعراض العقارات المتاحة
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3.5">
+                      {requests
+                        .filter(r => r.seekerId === currentUser.id)
+                        .map(req => {
+                          const isPending = req.status === 'pending';
+                          const isAccepted = req.status === 'accepted';
+                          const isRejected = req.status === 'rejected';
+                          const linkedBooking = bookings.find(b => b.requestId === req.id || b.id === req.bookingId);
+
+                          return (
+                            <div
+                              key={req.id}
+                              className={`p-4 sm:p-5 rounded-2xl border transition-all space-y-3 ${
+                                isPending
+                                  ? 'bg-amber-50/20 border-amber-200'
+                                  : isAccepted
+                                  ? 'bg-emerald-50/30 border-emerald-200'
+                                  : 'bg-slate-50 border-slate-200'
+                              }`}
+                            >
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
+                                <div>
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="font-mono text-xs font-bold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
+                                      {req.requestNumber}
+                                    </span>
+                                    <span className="text-[11px] text-slate-500 font-mono">{req.createdAt}</span>
+                                  </div>
+                                  <h4 className="font-bold text-slate-900 text-sm">{req.listingTitle}</h4>
+                                </div>
+
+                                <div>
+                                  <span
+                                    className={`text-xs font-extrabold px-3 py-1 rounded-full ${
+                                      isPending
+                                        ? 'bg-amber-100 text-amber-900 border border-amber-200'
+                                        : isAccepted
+                                        ? 'bg-emerald-100 text-emerald-900 border border-emerald-200 flex items-center gap-1.5'
+                                        : isRejected
+                                        ? 'bg-rose-100 text-rose-900 border border-rose-200'
+                                        : 'bg-slate-200 text-slate-800'
+                                    }`}
+                                  >
+                                    {isAccepted && <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-ping" />}
+                                    {isPending
+                                      ? 'قيد مراجعة المعلن'
+                                      : isAccepted
+                                      ? 'مقبول - حجز مؤقت مفعل'
+                                      : isRejected
+                                      ? 'اعتذر المعلن عن الطلب'
+                                      : 'ملغى'}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Details Grid */}
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                                <div>
+                                  <span className="text-slate-400 block mb-0.5">المعلن المسؤول:</span>
+                                  <span className="font-bold text-slate-900">{req.advertiserName}</span>
+                                </div>
+                                <div>
+                                  <span className="text-slate-400 block mb-0.5">هاتف المعلن:</span>
+                                  <span className="font-mono font-bold text-slate-900" dir="ltr">{req.advertiserPhone}</span>
+                                </div>
+                                <div>
+                                  <span className="text-slate-400 block mb-0.5">نوع الطلب:</span>
+                                  <span className="font-bold text-emerald-800">
+                                    {req.requestType === 'booking_intent'
+                                      ? 'حجز مؤقت وشراء'
+                                      : req.requestType === 'visit_inquiry'
+                                      ? 'معاينة ميدانية'
+                                      : 'تقديم عرض سعر'}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-slate-400 block mb-0.5">المدة المطلوبة:</span>
+                                  <span className="font-bold text-slate-800">{req.requestedDurationHours || 48} ساعة</span>
+                                </div>
+                              </div>
+
+                              {/* If Accepted & Active Booking Details */}
+                              {linkedBooking && linkedBooking.status === 'active' && (
+                                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-950 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                  <div className="space-y-0.5">
+                                    <div className="font-bold flex items-center gap-1.5 text-emerald-900">
+                                      <Lock className="w-3.5 h-3.5 text-emerald-700" />
+                                      <span>حجزك المؤقت فعال برقم [{linkedBooking.bookingNumber}]</span>
+                                    </div>
+                                    <p className="text-[11px] text-emerald-800">
+                                      ينتهي الحجز في: {new Date(linkedBooking.expiresAt).toLocaleString('ar-YE', { dateStyle: 'short', timeStyle: 'short' })}
+                                    </p>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setCancelBookingModalTarget(linkedBooking);
+                                      setCancelBookingReason('');
+                                    }}
+                                    className="py-1.5 px-3 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-800 text-xs font-bold transition-colors self-start sm:self-center"
+                                  >
+                                    إلغاء حجز العقار
+                                  </button>
+                                </div>
+                              )}
+
+                              {req.rejectionReason && (
+                                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800">
+                                  <span className="font-bold block mb-0.5">ملاحظات المعلن عند الرفض:</span>
+                                  {req.rejectionReason}
+                                </div>
+                              )}
+
+                              {isPending && (
+                                <div className="pt-2 border-t border-slate-100 flex items-center justify-end">
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      if (confirm('هل أنت متأكد من رغبتك بإلغاء هذا الطلب؟')) {
+                                        await cancelPropertyRequest(req.id, 'إلغاء بطلب الباحث');
+                                      }
+                                    }}
+                                    className="py-1.5 px-3.5 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-700 text-xs font-bold transition-all border border-slate-200"
+                                  >
+                                    إلغاء الطلب
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ACCEPT REQUEST MODAL */}
+          {acceptModalRequest && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">
+              <div
+                className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-md w-full overflow-hidden p-6 space-y-4 text-right"
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2 text-emerald-800 font-extrabold text-base">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                    <span>تأكيد الحجز المؤقت</span>
+                  </div>
+                  <button
+                    onClick={() => setAcceptModalRequest(null)}
+                    className="p-1 rounded-full text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="text-xs text-slate-600 space-y-2">
+                  <p>
+                    أنت بصدد قبول الطلب على العقار{' '}
+                    <strong className="text-slate-900">{acceptModalRequest.listingTitle}</strong> لصالح الباحث{' '}
+                    <strong className="text-slate-900">{acceptModalRequest.seekerName}</strong>.
+                  </p>
+                  <p className="text-amber-800 bg-amber-50 p-2.5 rounded-xl border border-amber-200">
+                    تنبيه: سيتم حجز العقار مؤقتاً ومنع تأكيد أي حجوزات متعارضة طوال مدة الحجز المختارة.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1.5">تحديد مدة الحجز المعتمدة:</label>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    {[
+                      { h: 24, label: '24 ساعة' },
+                      { h: 48, label: '48 ساعة (المعتاد)' },
+                      { h: 72, label: '72 ساعة' },
+                      { h: 120, label: '5 أيام' },
+                      { h: 168, label: '7 أيام' }
+                    ].map(item => (
+                      <button
+                        key={item.h}
+                        type="button"
+                        onClick={() => setAcceptDuration(item.h)}
+                        className={`py-2 px-1 text-center rounded-xl border font-bold transition-all ${
+                          acceptDuration === item.h
+                            ? 'bg-[#12A889] text-white border-[#12A889]'
+                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-white'
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1">ملاحظات للمشتري / الباحث:</label>
+                  <textarea
+                    value={acceptNotes}
+                    onChange={e => setAcceptNotes(e.target.value)}
+                    rows={2}
+                    placeholder="مرحباً، تم تأكيد حجز العقار بانتظار حضوركم غداً لمعاينة أصل البصيرة..."
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:bg-white focus:border-[#12A889]"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setAcceptModalRequest(null)}
+                    className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50"
+                  >
+                    إلغاء
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isAccepting}
+                    onClick={async () => {
+                      setIsAccepting(true);
+                      await acceptPropertyRequest(acceptModalRequest.id, acceptDuration, acceptNotes);
+                      setIsAccepting(false);
+                      setAcceptModalRequest(null);
+                    }}
+                    className="px-5 py-2 rounded-xl bg-[#12A889] hover:bg-[#0f8e74] text-white text-xs font-bold shadow-md flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {isAccepting ? 'جاري التأكيد...' : 'تأكيد الحجز الآن'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* REJECT REQUEST MODAL */}
+          {rejectModalRequest && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">
+              <div
+                className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-md w-full overflow-hidden p-6 space-y-4 text-right"
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2 text-rose-800 font-extrabold text-base">
+                    <XCircle className="w-5 h-5 text-rose-600" />
+                    <span>اعتذار ورفض الطلب</span>
+                  </div>
+                  <button
+                    onClick={() => setRejectModalRequest(null)}
+                    className="p-1 rounded-full text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  يرجى توضيح سبب الاعتذار للباحث{' '}
+                  <strong className="text-slate-900">{rejectModalRequest.seekerName}</strong>:
+                </p>
+
+                <div>
+                  <textarea
+                    value={rejectReason}
+                    onChange={e => setRejectReason(e.target.value)}
+                    rows={3}
+                    placeholder="مثال: العقار مباع مسبقاً، أو السعر المقترح غير مناسب، أو عدم توفر المالك حالياً..."
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:bg-white focus:border-rose-500"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setRejectModalRequest(null)}
+                    className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50"
+                  >
+                    إلغاء
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isRejecting}
+                    onClick={async () => {
+                      setIsRejecting(true);
+                      await rejectPropertyRequest(rejectModalRequest.id, rejectReason || 'اعتذار المعلن لعدم ملاءمة الشروط');
+                      setIsRejecting(false);
+                      setRejectModalRequest(null);
+                    }}
+                    className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {isRejecting ? 'جاري التسجيل...' : 'تأكيد الرفض'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* CANCEL BOOKING MODAL */}
+          {cancelBookingModalTarget && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">
+              <div
+                className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-md w-full overflow-hidden p-6 space-y-4 text-right"
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2 text-rose-800 font-extrabold text-base">
+                    <AlertTriangle className="w-5 h-5 text-rose-600" />
+                    <span>إلغاء الحجز المؤقت وإتاحة العقار</span>
+                  </div>
+                  <button
+                    onClick={() => setCancelBookingModalTarget(null)}
+                    className="p-1 rounded-full text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  هل أنت متأكد من إلغاء الحجز المؤقت رقم{' '}
+                  <strong className="text-slate-900">{cancelBookingModalTarget.bookingNumber}</strong>؟ عند الإلغاء، سيتم رفع القفل فوراً وإعادة العقار متاحاً للحجوزات الأخرى.
+                </p>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1">سبب الإلغاء:</label>
+                  <input
+                    type="text"
+                    value={cancelBookingReason}
+                    onChange={e => setCancelBookingReason(e.target.value)}
+                    placeholder="مثال: تم إلغاء الاتفاق ودياً أو تراجع المشتري..."
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:bg-white focus:border-rose-500"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setCancelBookingModalTarget(null)}
+                    className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50"
+                  >
+                    تراجع
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isCancellingBooking}
+                    onClick={async () => {
+                      setIsCancellingBooking(true);
+                      await cancelBooking(cancelBookingModalTarget.id, cancelBookingReason || 'إلغاء بطلب المستخدم');
+                      setIsCancellingBooking(false);
+                      setCancelBookingModalTarget(null);
+                    }}
+                    className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {isCancellingBooking ? 'جاري الإلغاء...' : 'تأكيد الإلغاء'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* EXTEND BOOKING MODAL */}
+          {extendBookingTarget && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">
+              <div
+                className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-md w-full overflow-hidden p-6 space-y-4 text-right"
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2 text-slate-900 font-extrabold text-base">
+                    <Clock className="w-5 h-5 text-[#12A889]" />
+                    <span>تمديد مدة الحجز المؤقت</span>
+                  </div>
+                  <button
+                    onClick={() => setExtendBookingTarget(null)}
+                    className="p-1 rounded-full text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  تمديد الحجز رقم{' '}
+                  <strong className="text-slate-900">{extendBookingTarget.bookingNumber}</strong> على العقار{' '}
+                  <strong className="text-slate-900">{extendBookingTarget.listingTitle}</strong>:
+                </p>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1.5">المدة الإضافية:</label>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    {[
+                      { h: 24, label: '+24 ساعة (يوم)' },
+                      { h: 48, label: '+48 ساعة (يومان)' },
+                      { h: 72, label: '+72 ساعة (3 أيام)' }
+                    ].map(item => (
+                      <button
+                        key={item.h}
+                        type="button"
+                        onClick={() => setExtendHours(item.h)}
+                        className={`py-2 px-1 text-center rounded-xl border font-bold transition-all ${
+                          extendHours === item.h
+                            ? 'bg-[#12A889] text-white border-[#12A889]'
+                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-white'
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setExtendBookingTarget(null)}
+                    className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50"
+                  >
+                    إلغاء
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isExtendingBooking}
+                    onClick={async () => {
+                      setIsExtendingBooking(true);
+                      await extendBooking(extendBookingTarget.id, extendHours);
+                      setIsExtendingBooking(false);
+                      setExtendBookingTarget(null);
+                    }}
+                    className="px-5 py-2 rounded-xl bg-[#12A889] hover:bg-[#0f8e74] text-white text-xs font-bold shadow-md flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {isExtendingBooking ? 'جاري التمديد...' : 'تأكيد التمديد'}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
