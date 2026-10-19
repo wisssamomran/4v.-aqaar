@@ -248,7 +248,7 @@
       "description": "أرض معتبرة على شارعين 14 و12 متر، موقع هادئ ومطل، قريبة من شارع الثلاثين في بيت بوس، المساحة الإجمالية 8 لبن عشاري حر مسجلة وموثقة بصيرة شرعية واضحة المعالم، صالحة لبناء برج سكني أو فيلا خاصة استثمارية.",
       "propertyType": "land",
       "purpose": "sale",
-      "status": "published",
+      "status": "completed",
       "price": 360000000,
       "currency": "YER",
       "isNegotiable": true,
@@ -308,15 +308,20 @@
           "changedBy": "مراجع المحتوى",
           "userRole": "moderator",
           "notes": "اعتمد الإعلان بعد مراجعة وثيقة البصيرة والبيانات"
+        },
+        {
+          "status": "completed",
+          "timestamp": "١٩‏/١٠‏/٢٠٢٦، ٢:١٣ ص",
+          "changedBy": "هشام عبد الرحمن القدسي",
+          "userRole": "advertiser",
+          "notes": "تم إتمام الصفقة العقارية (بيع/تأجير) وإغلاق الإعلان نهائياً بموجب الحجز BKG-2026-2004."
         }
       ],
-      "viewsCount": 2150,
+      "viewsCount": 2152,
       "favoritesCount": 79,
       "createdAt": "2026-02-18",
-      "updatedAt": "2026-02-20",
-      "isReserved": true,
-      "reservedUntil": "2026-10-20T01:14:54.039Z",
-      "activeBookingId": "bkg-1792372494039-300"
+      "updatedAt": "2026-10-19",
+      "isReserved": false
     },
     {
       "id": "list-104",
@@ -1030,6 +1035,90 @@
   ],
   "auditLogs": [
     {
+      "id": "log-1792375986906-811",
+      "timestamp": "١٩‏/١٠‏/٢٠٢٦، ٢:١٣ ص",
+      "userId": "adv-1",
+      "userName": "هشام عبد الرحمن القدسي",
+      "userRole": "advertiser",
+      "action": "إتمام الصفقة العقارية وإغلاق الإعلان",
+      "targetType": "booking",
+      "targetId": "bkg-1792375972482-734",
+      "result": "success",
+      "details": "تم إتمام الصفقة (بيع/إيجار) بنجاح للعقار [YEM-2026-103] بموجب الحجز [BKG-2026-2004]. العقار لن يعود لقوائم العرض المتاحة بموجب القاعدة."
+    },
+    {
+      "id": "log-1792375981455-468",
+      "timestamp": "١٩‏/١٠‏/٢٠٢٦، ٢:١٣ ص",
+      "userId": "usr-visitor",
+      "userName": "زائر المنصة",
+      "userRole": "visitor",
+      "action": "محاولة وصول لعقار محجوز حصرياً",
+      "targetType": "listing",
+      "targetId": "list-103",
+      "result": "denied",
+      "details": "تم حظر المستخدم [زائر المنصة - visitor] من الوصول المباشر للعقار المحجوز [YEM-2026-103] بموجب قاعدة الحصرية."
+    },
+    {
+      "id": "log-1792375972485-167",
+      "timestamp": "١٩‏/١٠‏/٢٠٢٦، ٢:١٢ ص",
+      "userId": "adv-1",
+      "userName": "هشام عبد الرحمن القدسي",
+      "userRole": "advertiser",
+      "action": "قبول الطلب وتأكيد الحجز المؤقت",
+      "targetType": "booking",
+      "targetId": "bkg-1792375972482-734",
+      "result": "success",
+      "details": "تم تأكيد حجز مؤقت برقم [BKG-2026-2004] على العقار [YEM-2026-103] لمدة [48] ساعة لصالح الباحث [أصيل محمد الحكيمي]"
+    },
+    {
+      "id": "log-1792375968435-372",
+      "timestamp": "١٩‏/١٠‏/٢٠٢٦، ٢:١٢ ص",
+      "userId": "usr-seeker",
+      "userName": "أصيل محمد الحكيمي",
+      "userRole": "seeker",
+      "action": "إرسال طلب عقار / حجز مؤقت",
+      "targetType": "request",
+      "targetId": "req-1792375968434-298",
+      "result": "success",
+      "details": "قام الباحث [أصيل محمد الحكيمي] بإرسال طلب نوع [booking_intent] على العقار [YEM-2026-103] برقم هاتف [+967 77 899 0011]"
+    },
+    {
+      "id": "log-1792375959895-231",
+      "timestamp": "١٩‏/١٠‏/٢٠٢٦، ٢:١٢ ص",
+      "userId": "adv-1",
+      "userName": "هشام عبد الرحمن القدسي",
+      "userRole": "advertiser",
+      "action": "إلغاء حجز عقاري مؤقت",
+      "targetType": "booking",
+      "targetId": "bkg-1792372494039-300",
+      "result": "warning",
+      "details": "قام [هشام عبد الرحمن القدسي] بإلغاء الحجز المؤقت [BKG-2026-2003] على العقار [YEM-2026-103]. السبب: اختبار إعادة الإتاحة عند إلغاء الحجز"
+    },
+    {
+      "id": "log-1792375939257-378",
+      "timestamp": "١٩‏/١٠‏/٢٠٢٦، ٢:١٢ ص",
+      "userId": "usr-seeker",
+      "userName": "أصيل محمد الحكيمي",
+      "userRole": "seeker",
+      "action": "محاولة وصول لعقار محجوز حصرياً",
+      "targetType": "listing",
+      "targetId": "list-103",
+      "result": "denied",
+      "details": "تم حظر المستخدم [أصيل محمد الحكيمي - seeker] من الوصول المباشر للعقار المحجوز [YEM-2026-103] بموجب قاعدة الحصرية."
+    },
+    {
+      "id": "log-1792375933550-196",
+      "timestamp": "١٩‏/١٠‏/٢٠٢٦، ٢:١٢ ص",
+      "userId": "usr-visitor",
+      "userName": "زائر المنصة",
+      "userRole": "visitor",
+      "action": "محاولة وصول لعقار محجوز حصرياً",
+      "targetType": "listing",
+      "targetId": "list-103",
+      "result": "denied",
+      "details": "تم حظر المستخدم [زائر المنصة - visitor] من الوصول المباشر للعقار المحجوز [YEM-2026-103] بموجب قاعدة الحصرية."
+    },
+    {
       "id": "log-1792372494041-908",
       "timestamp": "١٩‏/١٠‏/٢٠٢٦، ١:١٤ ص",
       "userId": "adv-1",
@@ -1380,7 +1469,7 @@
     }
   ],
   "meta": {
-    "lastUpdated": "2026-10-19T01:14:54.041Z",
+    "lastUpdated": "2026-10-19T02:13:06.907Z",
     "version": "1.0.0"
   },
   "staff": [
@@ -1870,6 +1959,30 @@
   ],
   "requests": [
     {
+      "id": "req-1792375968434-298",
+      "requestNumber": "REQ-2026-1005",
+      "listingId": "list-103",
+      "listingTitle": "أرض سكنية تجارية ممتازة على شارعين في بيت بوس",
+      "listingNumber": "YEM-2026-103",
+      "listingPrice": 360000000,
+      "listingCurrency": "YER",
+      "listingImage": "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1200&q=80",
+      "listingGovernorate": "صنعاء (أمانة العاصمة)",
+      "seekerId": "usr-seeker",
+      "seekerName": "أصيل محمد الحكيمي",
+      "seekerPhone": "+967 77 899 0011",
+      "advertiserId": "adv-1",
+      "advertiserName": "هشام عبد الرحمن القدسي",
+      "advertiserPhone": "773556677",
+      "requestType": "booking_intent",
+      "status": "accepted",
+      "notes": "طلب شراء وحجز نهائي",
+      "requestedDurationHours": 48,
+      "createdAt": "2026-10-19",
+      "updatedAt": "2026-10-19",
+      "bookingId": "bkg-1792375972482-734"
+    },
+    {
       "id": "req-1792372481169-547",
       "requestNumber": "REQ-2026-1004",
       "listingId": "list-103",
@@ -1969,6 +2082,32 @@
   ],
   "bookings": [
     {
+      "id": "bkg-1792375972482-734",
+      "bookingNumber": "BKG-2026-2004",
+      "requestId": "req-1792375968434-298",
+      "listingId": "list-103",
+      "listingTitle": "أرض سكنية تجارية ممتازة على شارعين في بيت بوس",
+      "listingNumber": "YEM-2026-103",
+      "listingImage": "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1200&q=80",
+      "listingGovernorate": "صنعاء (أمانة العاصمة)",
+      "listingPrice": 360000000,
+      "listingCurrency": "YER",
+      "seekerId": "usr-seeker",
+      "seekerName": "أصيل محمد الحكيمي",
+      "seekerPhone": "+967 77 899 0011",
+      "advertiserId": "adv-1",
+      "advertiserName": "هشام عبد الرحمن القدسي",
+      "advertiserPhone": "773556677",
+      "status": "completed",
+      "durationHours": 48,
+      "startDate": "2026-10-19T02:12:52.481Z",
+      "expiresAt": "2026-10-21T02:12:52.481Z",
+      "confirmedBy": "هشام عبد الرحمن القدسي",
+      "notes": "تم بحمد الله إتمام البيع وتوثيق البصيرة الشرعية في المحكمة",
+      "createdAt": "2026-10-19",
+      "updatedAt": "2026-10-19"
+    },
+    {
       "id": "bkg-1792372494039-300",
       "bookingNumber": "BKG-2026-2003",
       "requestId": "req-1792372481169-547",
@@ -1985,14 +2124,17 @@
       "advertiserId": "adv-1",
       "advertiserName": "هشام عبد الرحمن القدسي",
       "advertiserPhone": "773556677",
-      "status": "active",
+      "status": "cancelled",
       "durationHours": 24,
       "startDate": "2026-10-19T01:14:54.039Z",
       "expiresAt": "2026-10-20T01:14:54.039Z",
       "confirmedBy": "هشام عبد الرحمن القدسي",
       "notes": "تم قبول الطلب وتأكيد الحجز المؤقت لحين مراجعة وثائق وصكوك العقار",
       "createdAt": "2026-10-19",
-      "updatedAt": "2026-10-19"
+      "updatedAt": "2026-10-19",
+      "cancelledBy": "هشام عبد الرحمن القدسي",
+      "cancelledAt": "2026-10-19T02:12:39.894Z",
+      "cancellationReason": "اختبار إعادة الإتاحة عند إلغاء الحجز"
     },
     {
       "id": "bkg-1792372476615-376",

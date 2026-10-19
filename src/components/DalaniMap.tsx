@@ -98,10 +98,10 @@ export function filterListingsByRoleAndParams(
 
   let pool = [...listings];
 
-  // 1. تطبيق شروط الصلاحيات
+  // 1. تطبيق شروط الصلاحيات وقاعدة حصرية العقار المحجوز
   if (isPublic || !isAdminMode) {
-    // الزائر والباحث والوضع العام: العقارات المنشورة فقط
-    pool = pool.filter(l => l.status === 'published');
+    // الزائر والباحث والوضع العام: العقارات المنشورة وغير المحجوزة فقط (الحصرية التامة)
+    pool = pool.filter(l => l.status === 'published' && !l.isReserved);
   } else {
     switch (role) {
       case 'advertiser': {

@@ -365,8 +365,9 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectListing 
     let pool: Listing[] = [];
 
     // CASE A: Visitor / Seeker / or Admin in "Public Visitor Mode"
+    // قاعدة حصرية العقار المحجوز: يختفي فوراً من جميع القوائم والخرائط للعامة
     if (!isAdminMapMode || isPublicRole) {
-      pool = listings.filter(l => l.status === 'published');
+      pool = listings.filter(l => l.status === 'published' && !l.isReserved);
       if (visitorFilter === 'verified') {
         pool = pool.filter(l => Boolean(l.verificationBadges && l.verificationBadges.length > 0));
       } else if (visitorFilter === 'featured') {
@@ -546,7 +547,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate, onSelectListing 
         }
 
         default:
-          pool = listings.filter(l => l.status === 'published');
+          pool = listings.filter(l => l.status === 'published' && !l.isReserved);
           break;
       }
     }

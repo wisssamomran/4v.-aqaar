@@ -14,9 +14,9 @@ export const FavoritesPage: React.FC<FavoritesPageProps> = ({ onSelectListing, o
 
   const favoriteListings = listings.filter(l => favorites.includes(l.id));
 
-  // Separate active vs inactive listings in favorites
-  const activeFavorites = favoriteListings.filter(l => l.status === 'published');
-  const inactiveFavorites = favoriteListings.filter(l => l.status !== 'published');
+  // Separate active available vs inactive/reserved listings in favorites
+  const activeFavorites = favoriteListings.filter(l => l.status === 'published' && !l.isReserved);
+  const inactiveFavorites = favoriteListings.filter(l => l.status !== 'published' || l.isReserved);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">

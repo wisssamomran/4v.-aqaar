@@ -74,6 +74,7 @@ interface AppContextType {
   rejectPropertyRequest: (requestId: string, reason?: string) => Promise<{ success: boolean; message: string }>;
   cancelBooking: (bookingId: string, reason?: string) => Promise<{ success: boolean; message: string }>;
   extendBooking: (bookingId: string, additionalHours: number) => Promise<{ success: boolean; message: string }>;
+  completeBooking: (bookingId: string, notes?: string) => Promise<{ success: boolean; message: string; listing?: Listing }>;
   getActiveBookingForListing: (listingId: string) => PropertyBooking | undefined;
   
   // Listings CRUD & Transitions
@@ -1593,6 +1594,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const completeBooking = async (bookingId: string, notes?: string) => {
+    try {
+      const res = await apiFetch(`/api/bookings/${bookingId}/complete`, {
+        method: 'POST',
+        body: JSON.stringify({ notes })
+      });
+      const json = await res?.json();
+      if (res && res.ok) {
+        showToast(json.message || 'تم إتمام الصفقة بنجاح', 'success');
+        await Promise.all([fetchRequestsAndBookings(), refreshData()]);
+        return { success: true, message: json.message, listing: json.listing };
+      } else {
+        showToast(json?.error || 'تعذر إتمام الصفقة', 'error');
+        return { success: false, message: json?.error };
+      }
+    } catch (err: any) {
+      return { success: false, message: err.message };
+    }
+  };
+
   const getActiveBookingForListing = useCallback((listingId: string): PropertyBooking | undefined => {
     const now = new Date().getTime();
     return bookings.find(
@@ -1629,6 +1650,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         rejectPropertyRequest,
         cancelBooking,
         extendBooking,
+        completeBooking,
         getActiveBookingForListing,
         createListing,
         updateListing,

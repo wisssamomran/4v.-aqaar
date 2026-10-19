@@ -420,17 +420,24 @@ app.get('/api/listings', (req: Request, res: Response) => {
   const userRole = req.currentUser.role;
   const userId = req.currentUser.id;
   const isAdminView = adminMap === 'true' || scope === 'my_ads' || scope === 'org_ads' || scope === 'assigned';
+  const isPrivilegedOrStaff = ['moderator', 'verifier', 'reporter_admin', 'support', 'accountant', 'operations_manager', 'system_admin'].includes(userRole);
+  const isManagingParty = ['advertiser', 'org_manager', 'org_agent'].includes(userRole);
+  const effectiveAdminView = Boolean(isAdminView && (isPrivilegedOrStaff || isManagingParty));
 
-  // 1. Role Scopes & Authorization Rules
-  if (userRole === 'visitor' || userRole === 'seeker' || !isAdminView) {
-    // الزائر والباحث والوضع العام: العقارات المنشورة فقط
-    filtered = filtered.filter(l => l.status === 'published');
+  // 1. Role Scopes & Authorization Rules:
+  // بموجب قاعدة حصرية العقار المحجوز:
+  // يختفي أي عقار محجوز مؤقتاً (isReserved) من جميع القوائم والبحث والاستعراض العام وواجهات API العامة
+  if (!effectiveAdminView) {
+    // الزائر والباحث والوضع العام: العقارات المنشورة وغير المحجوزة فقط
+    filtered = filtered.filter(l => l.status === 'published' && !l.isReserved);
   } else if (userRole === 'advertiser') {
-    // المعلن الفردي: في خريطته الإدارية لا يرى سوى إعلاناته الشخصية
+    // المعلن الفردي: في لوحته الإدارية يرى إعلاناته الشخصية فقط (بما فيها المحجوزة لمتابعة العملية)
     filtered = filtered.filter(l => l.advertiser?.id === userId);
     if (status && status !== 'all') {
       if (status === 'unpublished') {
         filtered = filtered.filter(l => l.status !== 'published');
+      } else if (status === 'reserved') {
+        filtered = filtered.filter(l => l.isReserved === true);
       } else {
         filtered = filtered.filter(l => l.status === status);
       }
@@ -569,6 +576,32 @@ app.get('/api/listings/:id', (req: Request, res: Response) => {
   const listing = db.getListingById(req.params.id);
   if (!listing) {
     return res.status(404).json({ error: 'العقار غير موجود' });
+  }
+
+  // قاعدة حصرية العقار المحجوز:
+  // لا يمكن للباحث أو الزائر تجاوز الحصرية بفتح رابط العقار مباشرة أو باستخدام طلبات API
+  if (listing.isReserved) {
+    const isOwner = listing.advertiser?.id === req.currentUser.id;
+    const isOrgManager = req.currentUser.role === 'org_manager' && req.currentUser.orgId && listing.advertiser?.orgId === req.currentUser.orgId;
+    const isAssignedAgent = listing.assignedAgentId === req.currentUser.id;
+    const isStaff = ['system_admin', 'moderator', 'verifier', 'reporter_admin', 'support', 'accountant', 'operations_manager'].includes(req.currentUser.role);
+
+    if (!isOwner && !isOrgManager && !isAssignedAgent && !isStaff) {
+      recordAuditLog(
+        req.currentUser,
+        'محاولة وصول لعقار محجوز حصرياً',
+        'listing',
+        listing.id,
+        'denied',
+        `تم حظر المستخدم [${req.currentUser.name} - ${req.currentUser.role}] من الوصول المباشر للعقار المحجوز [${listing.listingNumber}] بموجب قاعدة الحصرية.`
+      );
+
+      return res.status(403).json({
+        error: 'هذا العقار محجوز حصرياً وغير متاح للعرض حالياً بموجب سياسة حصرية الحجز المؤقت في منصة دلنّي.',
+        isReserved: true,
+        reservedUntil: listing.reservedUntil
+      });
+    }
   }
 
   // Record view count
@@ -888,6 +921,11 @@ app.post('/api/requests', (req: Request, res: Response) => {
     offeredPrice: typeof offeredPrice === 'number' ? offeredPrice : undefined,
     preferredDate: preferredDate || undefined,
     requestedDurationHours: safeDuration,
+    listingPurpose: listing.purpose,
+    paymentMethod: req.body.paymentMethod || undefined,
+    rentalUsageType: req.body.rentalUsageType || undefined,
+    leaseDurationMonths: req.body.leaseDurationMonths ? Number(req.body.leaseDurationMonths) : undefined,
+    paymentFrequency: req.body.paymentFrequency || undefined,
     createdAt: now,
     updatedAt: now
   };
@@ -1283,6 +1321,50 @@ app.patch('/api/bookings/:id/extend', (req: Request, res: Response) => {
   return res.json({
     message: `تم تمديد الحجز بنجاح لمدة ${additionalHours} ساعة إضافية`,
     booking: updatedBooking
+  });
+});
+
+// Complete Temporary Booking & Finalize Deal (Sale or Rent)
+app.post('/api/bookings/:id/complete', (req: Request, res: Response) => {
+  if (req.currentUser.role === 'visitor') {
+    return res.status(401).json({ error: 'يجب تسجيل الدخول لإتمام الصفقة' });
+  }
+
+  const booking = db.getBookingById(req.params.id);
+  if (!booking) {
+    return res.status(404).json({ error: 'الحجز غير موجود' });
+  }
+
+  if (booking.status !== 'active') {
+    return res.status(400).json({ error: `لا يمكن إتمام الصفقة لحجز بحالة [${booking.status}]` });
+  }
+
+  const listing = db.getListingById(booking.listingId);
+  const isOwner = booking.advertiserId === req.currentUser.id || (listing && listing.advertiser?.id === req.currentUser.id);
+  const isOrgManager = req.currentUser.role === 'org_manager' && listing && req.currentUser.orgId && listing.advertiser?.orgId === req.currentUser.orgId;
+  const isAssignedAgent = listing && listing.assignedAgentId === req.currentUser.id;
+  const isSysAdmin = req.currentUser.role === 'system_admin';
+
+  if (!isOwner && !isOrgManager && !isAssignedAgent && !isSysAdmin) {
+    return res.status(403).json({ error: 'غير مصرح لك بإتمام الصفقة لهذا العقار' });
+  }
+
+  const { notes = 'تم إتمام الصفقة بنجاح ونقل الملكية / إبرام عقد الإيجار' } = req.body;
+  const result = db.completeBooking(booking.id, req.currentUser.name, notes);
+
+  recordAuditLog(
+    req.currentUser,
+    'إتمام الصفقة العقارية وإغلاق الإعلان',
+    'booking',
+    booking.id,
+    'success',
+    `تم إتمام الصفقة (بيع/إيجار) بنجاح للعقار [${booking.listingNumber}] بموجب الحجز [${booking.bookingNumber}]. العقار لن يعود لقوائم العرض المتاحة بموجب القاعدة.`
+  );
+
+  return res.json({
+    message: 'تهانينا! تم إتمام الصفقة العقارية بنجاح، وتم نقل حالة العقار إلى (تمت الصفقة) وإغلاقه نهائياً.',
+    booking: result.booking,
+    listing: result.listing
   });
 });
 

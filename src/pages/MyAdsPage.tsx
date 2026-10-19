@@ -30,7 +30,7 @@ interface MyAdsPageProps {
 export const MyAdsPage: React.FC<MyAdsPageProps> = ({ onNavigateToWizard, onSelectListing }) => {
   const { currentUser, listings, changeListingStatus, deleteListing, showToast } = useApp();
 
-  const [activeTab, setActiveTab] = useState<ListingStatus | 'all'>('all');
+  const [activeTab, setActiveTab] = useState<ListingStatus | 'all' | 'reserved'>('all');
   const [selectedTimelineListing, setSelectedTimelineListing] = useState<Listing | null>(null);
   const [displayMode, setDisplayMode] = useState<'list' | 'map'>('list');
 
@@ -60,6 +60,7 @@ export const MyAdsPage: React.FC<MyAdsPageProps> = ({ onNavigateToWizard, onSele
 
   const displayedListings = myFilteredListings.filter(l => {
     if (activeTab === 'all') return true;
+    if (activeTab === 'reserved') return Boolean(l.isReserved);
     return l.status === activeTab;
   });
 
@@ -73,12 +74,15 @@ export const MyAdsPage: React.FC<MyAdsPageProps> = ({ onNavigateToWizard, onSele
     suspended: { label: 'موقوف مؤقتاً', color: 'bg-rose-100 text-rose-800 border-rose-200', icon: <PauseCircle className="w-3.5 h-3.5 text-rose-600" /> },
     rejected: { label: 'مرفوض', color: 'bg-red-100 text-red-800 border-red-200', icon: <XCircle className="w-3.5 h-3.5 text-red-600" /> },
     expired: { label: 'منتهٍ', color: 'bg-slate-200 text-slate-800 border-slate-300', icon: <Clock className="w-3.5 h-3.5" /> },
-    cancelled: { label: 'ملغى', color: 'bg-slate-200 text-slate-800 border-slate-300', icon: <XCircle className="w-3.5 h-3.5" /> }
+    cancelled: { label: 'ملغى', color: 'bg-slate-200 text-slate-800 border-slate-300', icon: <XCircle className="w-3.5 h-3.5" /> },
+    completed: { label: 'تمت الصفقة', color: 'bg-emerald-50 text-emerald-800 border-emerald-200', icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> }
   };
 
   const counts = {
     all: myFilteredListings.length,
-    published: myFilteredListings.filter(l => l.status === 'published').length,
+    published: myFilteredListings.filter(l => l.status === 'published' && !l.isReserved).length,
+    reserved: myFilteredListings.filter(l => l.isReserved).length,
+    completed: myFilteredListings.filter(l => l.status === 'completed').length,
     under_review: myFilteredListings.filter(l => l.status === 'under_review').length,
     needs_changes: myFilteredListings.filter(l => l.status === 'needs_changes').length,
     draft: myFilteredListings.filter(l => l.status === 'draft').length,
@@ -134,7 +138,9 @@ export const MyAdsPage: React.FC<MyAdsPageProps> = ({ onNavigateToWizard, onSele
         <div className="bg-white p-1 rounded-2xl border border-slate-200 flex items-center gap-1 overflow-x-auto scrollbar-none text-xs font-bold">
           {[
             { tab: 'all', label: `الكل (${counts.all})` },
-            { tab: 'published', label: `المنشورة (${counts.published})` },
+            { tab: 'published', label: `المتاحة للعامة (${counts.published})` },
+            { tab: 'reserved', label: `محجوز حصرياً (${counts.reserved})` },
+            { tab: 'completed', label: `تمت الصفقة (${counts.completed})` },
             { tab: 'under_review', label: `قيد المراجعة (${counts.under_review})` },
             { tab: 'needs_changes', label: `مطلوب تعديلها (${counts.needs_changes})` },
             { tab: 'draft', label: `المسودات (${counts.draft})` },

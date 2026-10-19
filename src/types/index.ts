@@ -292,6 +292,11 @@ export interface PropertyRequest {
   cancellationReason?: string;
   cancelledBy?: string;
   bookingId?: string; // ID of booking created upon acceptance
+  listingPurpose?: ListingPurpose;
+  paymentMethod?: string;
+  rentalUsageType?: string;
+  leaseDurationMonths?: number;
+  paymentFrequency?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -309,6 +314,7 @@ export interface PropertyBooking {
   listingGovernorate?: string;
   listingPrice: number;
   listingCurrency: Currency;
+  listingPurpose?: ListingPurpose;
   seekerId: string;
   seekerName: string;
   seekerPhone: string;
@@ -321,6 +327,8 @@ export interface PropertyBooking {
   expiresAt: string; // ISO string
   confirmedBy: string;
   notes?: string;
+  paymentMethod?: string;
+  rentalUsageType?: string;
   cancellationReason?: string;
   cancelledBy?: string;
   cancelledAt?: string;

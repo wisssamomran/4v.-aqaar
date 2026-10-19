@@ -662,10 +662,12 @@ class LocalDatabase {
 
   // --- Listings Operations ---
   public getListings(): Listing[] {
+    this.checkBookingsExpiration();
     return [...this.data.listings];
   }
 
   public getListingById(id: string): Listing | undefined {
+    this.checkBookingsExpiration();
     return this.data.listings.find(l => l.id === id);
   }
 
@@ -1341,6 +1343,48 @@ class LocalDatabase {
     this.syncListingsReservationStatus();
     this.persist();
     return this.data.bookings[index];
+  }
+
+  public completeBooking(id: string, completedBy: string, notes?: string): { booking?: PropertyBooking; listing?: Listing } {
+    const booking = this.getBookingById(id);
+    if (!booking) return {};
+
+    const updatedBooking = this.updateBooking(id, {
+      status: 'completed',
+      notes: notes || 'تم إتمام الصفقة العقارية بنجاح ونقل الملكية / إبرام عقد الإيجار',
+      updatedAt: new Date().toISOString().split('T')[0]
+    });
+
+    const listing = this.getListingById(booking.listingId);
+    let updatedListing: Listing | undefined;
+    if (listing) {
+      const now = new Date().toISOString().split('T')[0];
+      const timeStr = new Date().toLocaleString('ar-YE', { dateStyle: 'short', timeStyle: 'short' });
+      const newTimeline = [
+        ...(listing.statusTimeline || []),
+        {
+          status: 'completed' as ListingStatus,
+          timestamp: timeStr,
+          changedBy: completedBy,
+          userRole: 'advertiser' as UserRole,
+          notes: `تم إتمام الصفقة العقارية (بيع/تأجير) وإغلاق الإعلان نهائياً بموجب الحجز ${booking.bookingNumber}.`
+        }
+      ];
+
+      updatedListing = this.updateListing(listing.id, {
+        status: 'completed',
+        isReserved: false,
+        reservedUntil: undefined,
+        activeBookingId: undefined,
+        statusTimeline: newTimeline,
+        updatedAt: now
+      });
+    }
+
+    this.syncListingsReservationStatus();
+    this.persist();
+
+    return { booking: updatedBooking, listing: updatedListing };
   }
 
   public checkBookingsExpiration(): boolean {

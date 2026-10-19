@@ -50,8 +50,8 @@ export const SearchPage: React.FC<SearchPageProps> = ({ initialParams = {}, onSe
   const filteredListings = useMemo(() => {
     return listings
       .filter(listing => {
-        // Must be published and active
-        if (listing.status !== 'published') return false;
+        // Must be published and active, and not reserved (قاعدة حصرية العقار المحجوز)
+        if (listing.status !== 'published' || listing.isReserved) return false;
 
         // Keyword filter
         if (keyword.trim()) {

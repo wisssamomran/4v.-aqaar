@@ -87,8 +87,18 @@ export const ListingCard: React.FC<ListingCardProps> = ({
           </span>
         </div>
 
-        {/* Status Badge (if enabled) */}
-        {showStatusBadge && (
+        {/* Reserved Badge if listing is reserved */}
+        {listing.isReserved && (
+          <div className="absolute top-3 left-12 flex items-center gap-1">
+            <span className="px-2.5 py-1 rounded-lg text-[11px] font-black text-amber-900 bg-amber-200/95 border border-amber-300 shadow-xs flex items-center gap-1 backdrop-blur-xs">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse" />
+              <span>محجوز حصرياً</span>
+            </span>
+          </div>
+        )}
+
+        {/* Status Badge (if enabled and not reserved) */}
+        {showStatusBadge && !listing.isReserved && (
           <div className="absolute top-3 left-12">
             <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${statusInfo.color}`}>
               {statusInfo.label}

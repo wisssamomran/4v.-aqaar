@@ -66,6 +66,7 @@ export const MyAccountPage: React.FC<MyAccountPageProps> = ({
     cancelPropertyRequest,
     cancelBooking,
     extendBooking,
+    completeBooking,
     fetchRequestsAndBookings,
     showToast
   } = useApp();
@@ -984,6 +985,7 @@ export const MyAccountPage: React.FC<MyAccountPageProps> = ({
                             const isPending = req.status === 'pending';
                             const isAccepted = req.status === 'accepted';
                             const isRejected = req.status === 'rejected';
+                            const linkedBooking = bookings.find(b => b.requestId === req.id || b.id === req.bookingId);
 
                             return (
                               <div
@@ -1066,6 +1068,58 @@ export const MyAccountPage: React.FC<MyAccountPageProps> = ({
                                   <div className="p-3 bg-white rounded-xl border border-slate-200 text-xs text-slate-700 leading-relaxed mb-3">
                                     <span className="font-bold text-slate-900 block mb-0.5">رسالة الباحث:</span>
                                     {req.notes}
+                                  </div>
+                                )}
+
+                                {/* Active Booking Process Card & Deal Finalization */}
+                                {isAccepted && linkedBooking && linkedBooking.status === 'active' && (
+                                  <div className="p-3.5 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-950 flex flex-col md:flex-row md:items-center justify-between gap-3 mb-2">
+                                    <div className="space-y-0.5">
+                                      <div className="font-bold flex items-center gap-1.5 text-emerald-900">
+                                        <Lock className="w-3.5 h-3.5 text-emerald-700" />
+                                        <span>الحجز المؤقت سارٍ برقم [{linkedBooking.bookingNumber}] - العقار محجوب حصرياً</span>
+                                      </div>
+                                      <p className="text-[11px] text-emerald-800">
+                                        ينتهي الحجز في: {new Date(linkedBooking.expiresAt).toLocaleString('ar-YE', { dateStyle: 'short', timeStyle: 'short' })}
+                                      </p>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          if (window.confirm('هل تؤكد إتمام الصفقة (بيع أو إيجار)؟ سيتم تحديث حالة الإعلان إلى (تمت الصفقة) وإغلاقه نهائياً ولن يعود للظهور العام.')) {
+                                            await completeBooking(linkedBooking.id, 'تمت الصفقة بنجاح وتم توقيع العقد ونقل الملكية');
+                                          }
+                                        }}
+                                        className="py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1 transition-colors cursor-pointer shadow-xs"
+                                      >
+                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                        <span>إتمام الصفقة (بيع/تأجير)</span>
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setExtendBookingTarget(linkedBooking);
+                                          setExtendHours(24);
+                                        }}
+                                        className="py-1.5 px-3 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-900 font-bold text-xs transition-colors cursor-pointer"
+                                      >
+                                        تمديد الحجز
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setCancelBookingModalTarget(linkedBooking);
+                                          setCancelBookingReason('');
+                                        }}
+                                        className="py-1.5 px-3 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-800 font-bold text-xs transition-colors cursor-pointer"
+                                      >
+                                        إلغاء الحجز وإعادة الإتاحة
+                                      </button>
+                                    </div>
                                   </div>
                                 )}
 

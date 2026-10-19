@@ -42,7 +42,17 @@ export const ListingDetailsPage: React.FC<ListingDetailsPageProps> = ({
   onOpenAuth,
   onOpenVisitorGate
 }) => {
-  const { currentUser, isFavorite, toggleFavorite, submitReport, showToast, listings, getActiveBookingForListing } = useApp();
+  const {
+    currentUser,
+    isFavorite,
+    toggleFavorite,
+    submitReport,
+    showToast,
+    listings,
+    getActiveBookingForListing,
+    completeBooking,
+    cancelBooking
+  } = useApp();
   const favorited = isFavorite(listing.id);
 
   const [activeImageIndex, setActiveImageIndex] = useState(0);
@@ -54,7 +64,14 @@ export const ListingDetailsPage: React.FC<ListingDetailsPageProps> = ({
   const [reporterPhone, setReporterPhone] = useState('');
 
   const activeBooking = getActiveBookingForListing(listing.id);
-  const isReserved = Boolean(listing.isReserved || activeBooking);
+  const isReserved = Boolean(listing.isReserved || (activeBooking && activeBooking.status === 'active'));
+
+  // Authorization for reserved property: owner, org manager, assigned agent, or authorized staff
+  const isOwner = listing.advertiser?.id === currentUser.id;
+  const isOrgManager = currentUser.role === 'org_manager' && Boolean(currentUser.orgId && listing.advertiser?.orgId === currentUser.orgId);
+  const isAssignedAgent = listing.assignedAgentId === currentUser.id;
+  const isAuthorizedStaff = ['system_admin', 'moderator', 'verifier', 'reporter_admin', 'support', 'accountant', 'operations_manager'].includes(currentUser.role);
+  const isAuthorizedToManageOrInspect = isOwner || isOrgManager || isAssignedAgent || isAuthorizedStaff;
 
   // Safe images fallback
   const safeImages = (listing.images && listing.images.length > 0)
@@ -103,18 +120,146 @@ export const ListingDetailsPage: React.FC<ListingDetailsPageProps> = ({
     setReporterPhone('');
   };
 
-  // Find similar listings in same governorate
+  // Find similar listings in same governorate (Excluded if reserved)
   const similarListings = listings
     .filter(
       l =>
         l.id !== listing.id &&
         l.status === 'published' &&
+        !l.isReserved &&
         (l.location?.governorate === listing.location?.governorate || l.propertyType === listing.propertyType)
     )
     .slice(0, 3);
 
+  // Requirement 2: Exclusivity barrier screen for unauthorized seekers/visitors
+  if (isReserved && !isAuthorizedToManageOrInspect) {
+    const reservedUntilFormatted = (activeBooking?.expiresAt || listing.reservedUntil)
+      ? new Date(activeBooking?.expiresAt || listing.reservedUntil!).toLocaleString('ar-YE', { dateStyle: 'short', timeStyle: 'short' })
+      : 'سارٍ حالياً';
+
+    return (
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-6">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-2 text-xs md:text-sm font-bold text-slate-600 hover:text-[#12A889] transition-colors cursor-pointer"
+        >
+          <ArrowRight className="w-4 h-4" />
+          <span>الرجوع إلى القائمة</span>
+        </button>
+
+        <div className="bg-white rounded-3xl border border-amber-200/90 p-8 sm:p-12 text-center shadow-lg space-y-6">
+          <div className="w-20 h-20 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center mx-auto shadow-inner">
+            <Lock className="w-10 h-10" />
+          </div>
+
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-amber-100 text-amber-900 text-xs font-black border border-amber-300">
+              <Clock className="w-3.5 h-3.5 text-amber-700" />
+              <span>قاعدة حصرية العقار المحجوز مفعلة</span>
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-black text-[#16324F]">
+              هذا العقار محجوز حصرياً وغير متاح للعرض حالياً
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-600 max-w-xl mx-auto leading-relaxed">
+              بموجب سياسة حصرية الحجز المؤقت في منصة دلنّي، يتم حجب تفاصيل العقار وأرقام التواصل وصور المعاينة بالكامل فور قبول الحجز، لحماية حقوق الأطراف ومنع التنافس والازدواجية على نفس العقار.
+            </p>
+          </div>
+
+          <div className="bg-slate-50 rounded-2xl p-4 sm:p-5 border border-slate-200 max-w-lg mx-auto grid grid-cols-2 gap-3 text-right">
+            <div>
+              <span className="text-slate-400 text-xs block mb-1">رقم الإعلان:</span>
+              <span className="font-mono font-bold text-slate-800 text-sm">{listing.listingNumber}</span>
+            </div>
+            <div>
+              <span className="text-slate-400 text-xs block mb-1">حالة الحصرية:</span>
+              <span className="font-bold text-amber-700 text-sm">حجز مؤقت سارٍ</span>
+            </div>
+            <div>
+              <span className="text-slate-400 text-xs block mb-1">المحافظة:</span>
+              <span className="font-bold text-slate-800 text-sm">{listing.location.governorate}</span>
+            </div>
+            <div>
+              <span className="text-slate-400 text-xs block mb-1">انتهاء مهلة الحجز:</span>
+              <span className="font-bold text-slate-800 text-xs font-mono">{reservedUntilFormatted}</span>
+            </div>
+          </div>
+
+          <div className="p-4 bg-emerald-50/70 border border-emerald-100 rounded-2xl max-w-lg mx-auto text-xs text-emerald-900 leading-relaxed text-right flex items-start gap-2.5">
+            <ShieldCheck className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+            <p>
+              <strong>ضمان الشفافية:</strong> في حال انتهاء مهلة الحجز دون إتمام الصفقة، أو في حال اعتذار الطرفين وإلغاء الحجز، يُعاد العقار للظهور التلقائي للعامة إذا كان الإعلان نشطاً ومتاحاً.
+            </p>
+          </div>
+
+          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <button
+              onClick={onBack}
+              className="w-full sm:w-auto px-6 py-3 rounded-xl bg-[#12A889] hover:bg-[#0f8e74] text-white text-xs sm:text-sm font-bold shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <span>تصفح العقارات المتاحة للبحث</span>
+              <ArrowRight className="w-4 h-4 rotate-180" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      {/* Top Banner for Authorized Managers/Owners on Reserved Property */}
+      {isReserved && (
+        <div className="p-4 sm:p-5 bg-amber-50 border-2 border-amber-300 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs text-amber-950 shadow-xs">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-200/80 flex items-center justify-center flex-shrink-0 text-amber-800 mt-0.5">
+              <Lock className="w-5 h-5" />
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-black text-sm text-amber-900">
+                  لوحة المتابعة الإدارية: هذا العقار محجوز حصرياً حالياً
+                </span>
+                <span className="px-2 py-0.5 rounded-md bg-amber-200 text-amber-900 font-mono font-bold text-[11px]">
+                  مخفي عن العامة والبحث
+                </span>
+              </div>
+              <p className="text-slate-600">
+                العقار محجوز مؤقتاً لصالح الباحث <strong>{activeBooking?.seekerName || 'الباحث'}</strong> ({activeBooking?.seekerPhone || ''}) حتى <strong>{activeBooking?.expiresAt ? new Date(activeBooking.expiresAt).toLocaleString('ar-YE', { dateStyle: 'short', timeStyle: 'short' }) : 'انتهاء المهلة'}</strong>.
+              </p>
+            </div>
+          </div>
+
+          {(isOwner || isOrgManager || currentUser.role === 'system_admin') && activeBooking && (
+            <div className="flex items-center gap-2 self-start md:self-auto flex-wrap">
+              <button
+                type="button"
+                onClick={async () => {
+                  if (window.confirm('هل تؤكد إتمام الصفقة (بيع أو إيجار)؟ سيتم تحديث حالة الإعلان إلى (تمت الصفقة) وإغلاقه نهائياً ولن يعود للظهور العام.')) {
+                    await completeBooking(activeBooking.id, 'تمت الصفقة بنجاح وتم تحويل الملكية/توقيع العقد');
+                  }
+                }}
+                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>إتمام الصفقة (بيع/تأجير)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  const reason = window.prompt('يرجى كتابة سبب إلغاء الحجز المؤقت:');
+                  if (reason !== null) {
+                    await cancelBooking(activeBooking.id, reason || 'إلغاء باتفاق الطرفين');
+                  }
+                }}
+                className="px-3 py-2 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-800 font-bold text-xs transition-colors cursor-pointer"
+              >
+                <span>إلغاء الحجز وإعادة الإتاحة</span>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
       {/* Top Breadcrumb & Action Bar */}
       <div className="flex items-center justify-between flex-wrap gap-4 border-b border-slate-200 pb-4">
         <button
